@@ -1,0 +1,114 @@
+/Users/wenjuanchen/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+INFO:     Started server process [45051]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/wenjuanchen/Library/Python/3.9/lib/python/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+AttributeError: module 'bcrypt' has no attribute '__about__'
+INFO:     127.0.0.1:51077 - "POST /auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51079 - "POST /guided-diary/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51081 - "POST /guided-diary/3/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51087 - "POST /guided-diary/3/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51091 - "POST /guided-diary/3/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51095 - "POST /guided-diary/3/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51099 - "POST /guided-diary/3/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51105 - "GET /guided-diary/3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51107 - "POST /guided-diary/3/edit HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51109 - "GET /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51111 - "GET /guided-diary-calendar/by-date/2025-08-13 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51113 - "GET /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51115 - "POST /auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51117 - "POST /guided-diary/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51119 - "POST /guided-diary/4/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51313 - "OPTIONS /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51313 - "GET /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51313 - "OPTIONS /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51314 - "OPTIONS /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51313 - "GET /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51314 - "GET /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51316 - "OPTIONS /guided-diary/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51316 - "POST /guided-diary/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51322 - "OPTIONS /guided-diary/5/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51322 - "POST /guided-diary/5/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53082 - "OPTIONS /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53082 - "GET /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53084 - "OPTIONS /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53085 - "OPTIONS /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53084 - "GET /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53085 - "GET /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53198 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62813 - "OPTIONS /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62813 - "GET /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62816 - "OPTIONS /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62817 - "OPTIONS /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62816 - "GET /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62817 - "GET /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62816 - "OPTIONS /guided-diary/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62817 - "OPTIONS /guided-diary/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62816 - "POST /guided-diary/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62817 - "POST /guided-diary/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62820 - "OPTIONS /guided-diary/6/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62820 - "POST /guided-diary/6/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62939 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63140 - "GET /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63140 - "GET /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63141 - "GET /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63140 - "GET /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63141 - "GET /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63140 - "GET /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63147 - "POST /guided-diary/6/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63385 - "OPTIONS /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63385 - "GET /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63385 - "OPTIONS /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63386 - "OPTIONS /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63385 - "GET /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63386 - "GET /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63388 - "OPTIONS /guided-diary/6/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63388 - "POST /guided-diary/6/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63450 - "POST /guided-diary/6/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63457 - "POST /guided-diary/6/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63486 - "POST /guided-diary/6/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63554 - "POST /guided-diary/6/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63602 - "OPTIONS /guided-diary/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63602 - "POST /guided-diary/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63602 - "POST /guided-diary/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63609 - "OPTIONS /diary/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63609 - "GET /diary/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63615 - "GET /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63615 - "GET /diary/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63615 - "GET /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63615 - "GET /diary/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63615 - "GET /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63617 - "GET /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63615 - "GET /diary/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63619 - "OPTIONS /llm/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63619 - "POST /llm/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63623 - "POST /llm/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63623 - "GET /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63626 - "GET /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63623 - "POST /guided-diary/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63706 - "GET /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63706 - "GET /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63707 - "GET /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63706 - "GET /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63707 - "GET /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63706 - "GET /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63707 - "POST /guided-diary/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63706 - "GET /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63707 - "GET /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63710 - "POST /guided-diary/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63710 - "GET /diary/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63710 - "GET /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63712 - "GET /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64580 - "OPTIONS /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64581 - "OPTIONS /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64580 - "GET /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64581 - "GET /guided-diary-session/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64580 - "OPTIONS /guided-diary/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64581 - "POST /guided-diary/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65152 - "GET /guided-diary-calendar/dates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65153 - "GET /guided-diary-session/active HTTP/1.1" 200 OK

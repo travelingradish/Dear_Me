@@ -20,10 +20,11 @@ app = FastAPI(title="Daily Check-in API", version="2.0.0")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React dev server
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # React dev server
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Initialize LLM service
@@ -65,6 +66,10 @@ async def get_current_user(
 async def root():
     return {"message": "Daily Check-in API v2.0", "status": "running"}
 
+@app.options("/auth/register")
+async def options_register():
+    return {"message": "OK"}
+
 @app.post("/auth/register")
 async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     # Check if user exists
@@ -90,6 +95,10 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
         "token_type": "bearer",
         "user": {"id": user.id, "username": user.username, "email": user.email}
     }
+
+@app.options("/auth/login")
+async def options_login():
+    return {"message": "OK"}
 
 @app.post("/auth/login")
 async def login(user_data: UserLogin, db: Session = Depends(get_db)):

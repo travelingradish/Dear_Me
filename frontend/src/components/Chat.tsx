@@ -52,7 +52,7 @@ const Chat: React.FC = () => {
     setLoading(true);
 
     try {
-      // Build conversation history for API
+      // Build conversation history for API (all previous messages)
       const conversationHistory = messages.map(msg => ({
         type: msg.sender === 'user' ? 'user' : 'assistant',
         message: msg.content,

@@ -27,9 +27,9 @@ class OllamaLLMService:
                 }
             },
             'zh': {
-                'qwen2.5:8b': {
-                    'name': 'qwen2.5:8b',
-                    'display_name': 'Qwen 2.5 (8B)',
+                'qwen3:8b': {
+                    'name': 'qwen3:8b',
+                    'display_name': 'Qwen 3 (8B)',
                     'description': 'Specialized Chinese language model'
                 }
             }
@@ -38,7 +38,7 @@ class OllamaLLMService:
         # Default model selections
         self.default_models = {
             'en': 'gemma3:4b',
-            'zh': 'qwen2.5:8b'
+            'zh': 'qwen3:8b'
         }
         
         # System prompts for different purposes

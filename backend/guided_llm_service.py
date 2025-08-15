@@ -14,7 +14,7 @@ class GuidedLLMService:
         # Default model selections
         self.default_models = {
             'en': 'gemma3:4b',
-            'zh': 'qwen2.5:8b'
+            'zh': 'qwen3:8b'
         }
         
         # Guide phase system prompts

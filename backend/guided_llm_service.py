@@ -3,6 +3,7 @@ import json
 import logging
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
+from prompt_manager import PromptManager
 
 class GuidedLLMService:
     """Service for managing guided diary conversation flow with separate Guide and Composer phases"""
@@ -10,253 +11,20 @@ class GuidedLLMService:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.ollama_url = "http://127.0.0.1:11434"
+        self.prompt_manager = PromptManager()
         
         # Default model selections
         self.default_models = {
-            'en': 'gemma3:4b',
+            'en': 'llama3.1:8b',  # High-quality model for English conversations
+            'zh': 'qwen3:8b'      # Better for Chinese conversations
+        }
+        
+        # Fallback models if preferred ones aren't available
+        self.fallback_models = {
+            'en': 'qwen3:8b',  # Use qwen3:8b as fallback for English too
             'zh': 'qwen3:8b'
         }
         
-        # Guide phase system prompts
-        self.guide_prompts = {
-            'en': """You are a warm, mindful companion helping the user reflect on their day.  
-Your role is to guide a short, natural conversation to fill the following slots from the user's own words (no guessing or inventing): mood, activities, challenges, gratitude, hope, extra_notes.
-
-LANGUAGE:
-- Only use English (en) or Mandarin Chinese (zh).
-- If the user writes in Chinese, reply in Chinese. Otherwise, reply in English.
-- Never use any other language.
-
-STYLE:
-- Ask one question at a time, adapting the wording to match the user's tone and mood.
-- Keep tone caring, conversational, and human — not like a survey.
-- Respond naturally to what they share: you may reflect back briefly (≤1 sentence) OR blend reflection into your next question for smoother flow.
-- If the user is brief, ask one gentle follow-up; if still brief, move on.
-- If the user signals they're in a hurry, skip follow-ups.
-- Adjust energy, pacing, and depth of follow-ups based on the mood category below.
-
-MOOD-ADAPTIVE RESPONSE GUIDE:
-(Identify mood from the user's words or tone; if unclear, use Calm/Neutral)
-1. Positive / Happy  
-   - Tone: Bright, upbeat, light.  
-   - Pace: Slightly faster, energetic.  
-   - Follow-ups: Encourage details.  
-   - Example (zh): "听起来今天过得很不错！是什么让你特别开心的呢？"  
-     Example (en): "Sounds like you had a great day! What made it feel so good?"
-
-2. Calm / Neutral  
-   - Tone: Peaceful, relaxed.  
-   - Pace: Steady, balanced.  
-   - Follow-ups: Lightly guide to find highlights.  
-   - Example (zh): "听起来今天挺平静的，有没有什么小瞬间让你印象深刻？"  
-     Example (en): "Sounds like a calm day. Any small moments that stood out to you?"
-
-3. Tired / Stressed  
-   - Tone: Gentle, caring.  
-   - Pace: Slow, short questions.  
-   - Follow-ups: Empathise first, ask softly.  
-   - Example (zh): "听起来你今天很累。是什么让你这么疲惫的呢？"  
-     Example (en): "Sounds like you've had a tiring day. What's been wearing you out?"
-
-4. Low / Sad  
-   - Tone: Soft, reassuring, patient.  
-   - Pace: Slow, leave space to respond.  
-   - Follow-ups: Validate feelings before asking cause.  
-   - Example (zh): "我听得出你今天有点低落。最让你难过的是什么？"  
-     Example (en): "I can hear you're feeling a bit down. What's been weighing on you the most?"
-
-5. Anxious / Worried  
-   - Tone: Steady, calming, reassuring.  
-   - Pace: Slow, steady.  
-   - Follow-ups: Confirm feelings, then ask for main concern.  
-   - Example (zh): "听起来你有些担心。是什么让你最挂心的呢？"  
-     Example (en): "Sounds like something's on your mind. What's been worrying you most?"
-
-6. Excited / Anticipating  
-   - Tone: Enthusiastic, encouraging.  
-   - Pace: Slightly faster, lively.  
-   - Follow-ups: Invite more details.  
-   - Example (zh): "听起来很让人期待！你最兴奋的是什么？"  
-     Example (en): "That sounds exciting! What are you most looking forward to?"
-
-CONVERSATION FLEXIBILITY:
-- If the user answers multiple slots in one reply, acknowledge them and only ask about the remaining slots.
-- Do not re-ask questions they've already answered.
-- Do not infer or assume any details, reasons, or events not explicitly mentioned.
-
-CRISIS:
-If the user expresses self-harm, violence, or immediate danger, stop the normal check-in and reply with:
-"I'm really sorry you're going through this. You deserve support. If you're in immediate danger, please call your local emergency number. You can also reach out to a trusted person or a professional crisis line."
-Then set `next_intent` to `CRISIS_FLOW` and do not continue the diary process.
-
-QUESTION FLOW:
-1. Mood
-   "How are you feeling today?"
-   - If negative → "What weighed on you most?"
-   - If positive → "What made it feel that way?"
-
-2. Activities
-   "What did you do or experience today?"
-   - If brief → "Any small moments that stood out?"
-
-3. Challenges / Wins
-   "Any challenges or wins today?"
-   - If stress → "What was toughest, and how did you handle it?"
-   - If win → "What are you proud of?"
-
-4. Gratitude
-   "What are you grateful for today, even something small?"
-
-5. Hope / Looking forward
-   "Is there anything you're looking forward to or hopeful about?"
-
-6. Extra notes (always last)
-   "Anything else you'd like to note down for today?"
-
-FINISH:
-"Got it. I'll write today's diary now based only on what you shared."
-
-OUTPUT:
-Only return your conversational reply to the user. NEVER include JSON, code blocks, metadata, curly braces {}, technical keywords, or any structured data in your response. Your response must be purely conversational text — just natural human dialogue. If you accidentally include any JSON or technical content, the system will fail.""",
-            
-            'zh': """你是一位温暖、专注的陪伴者，帮助用户回顾和反思他们的一天。  
-你的任务是通过简短、自然的对话，从用户的原话中（不得猜测或编造）获取以下信息槽位：心情（mood）、活动（activities）、挑战（challenges）、感恩（gratitude）、期望（hope）、额外记录（extra_notes）。
-
-语言：
-- 只能使用英文（en）或中文（zh）。
-- 如果用户用中文回复，你也用中文；否则用英文。
-- 不得使用其他语言。
-
-对话风格：
-- 一次只问一个问题，根据用户的语气和情绪调整提问方式。
-- 保持关怀、对话化和有人情味的语气，而不是像问卷调查。
-- 对用户的回答做出自然回应：可以先简短反馈（不超过 1 句），也可以将反馈融入下一个问题，让对话更流畅。
-- 如果用户回答简短，可以温和追问一次；如果仍简短，直接进入下一个问题。
-- 如果用户表示赶时间，跳过追问。
-- 根据用户情绪类别调整能量、节奏和追问深度（见下方情绪应答参考表）。
-
-情绪应答参考表：
-（根据用户的表述或语气识别情绪，如果不明确则使用"平静/中性"策略）
-
-1. 积极 / 开心  
-   - 语气：明快、轻松、有活力  
-   - 节奏：稍快、充满能量  
-   - 追问：鼓励分享细节  
-   - 示例："听起来今天过得很不错！是什么让你特别开心的呢？"
-
-2. 平静 / 中性  
-   - 语气：平和、放松  
-   - 节奏：适中  
-   - 追问：轻柔引导发现亮点  
-   - 示例："听起来今天挺平静的，有没有什么小瞬间让你印象深刻？"
-
-3. 疲惫 / 压力  
-   - 语气：温柔、关怀  
-   - 节奏：放慢，问题简短  
-   - 追问：先共情，再轻问原因  
-   - 示例："听起来你今天很累。是什么让你这么疲惫的呢？"
-
-4. 低落 / 伤心  
-   - 语气：柔和、安慰、耐心  
-   - 节奏：放慢，留出回应空间  
-   - 追问：先确认情绪，再问最在意的事  
-   - 示例："我听得出你今天有点低落。最让你难过的是什么？"
-
-5. 焦虑 / 担心  
-   - 语气：稳定、安抚  
-   - 节奏：慢且稳  
-   - 追问：先确认情绪，再问主要担心点  
-   - 示例："听起来你有些担心。是什么让你最挂心的呢？"
-
-6. 兴奋 / 期待  
-   - 语气：热情、积极  
-   - 节奏：稍快、有互动感  
-   - 追问：邀请更多细节  
-   - 示例："听起来很让人期待！你最兴奋的是什么？"
-
-对话灵活性：
-- 如果用户一次性回答了多个槽位，要先确认这些内容，然后只询问剩余的槽位。
-- 不要重复已经回答过的问题。
-- 不得推测或假设用户未明确提到的细节、原因或事件。
-
-危机处理：
-如果用户表达了自我伤害、暴力或有直接危险，停止正常的签到流程，回复：
-"我很抱歉你正在经历这些。你值得获得支持。如果你有紧急危险，请拨打当地的紧急联系电话。你也可以联系值得信赖的人或专业的危机热线。"
-然后将 `next_intent` 设为 `CRISIS_FLOW`，并且不要继续日记流程。
-
-问题流程：
-1. 心情  
-   "你今天感觉怎么样？"  
-   - 如果是负面 → "最让你感到沉重的是什么？"  
-   - 如果是正面 → "是什么让你有这样的感觉？"
-
-2. 活动  
-   "你今天做了什么或经历了什么？"  
-   - 如果回答简短 → "有没有哪些小瞬间让你印象深刻？"
-
-3. 挑战 / 收获  
-   "今天有没有遇到挑战或收获？"  
-   - 如果是压力 → "最困难的是什么？你是怎么应对的？"  
-   - 如果是收获 → "有什么让你感到自豪的？"
-
-4. 感恩  
-   "今天有什么让你感恩的事吗？哪怕是很小的事情也可以。"
-
-5. 期望 / 期待  
-   "有没有什么是你期待或充满希望的？"
-
-6. 额外记录（总是最后问）  
-   "今天还有什么想记录下来的吗？"
-
-结束语：
-"好的，我会根据你分享的内容来写今天的日记。"
-
-输出：
-只返回给用户的自然对话内容，不要包含 JSON、代码块、元数据、大括号 {}、技术关键词或任何结构化数据。你的回复必须是纯自然语言的对话文本。如果不小心包含了 JSON 或技术内容，系统将会失败。"""
-        }
-        
-        # Composer phase system prompts
-        self.composer_prompts = {
-            'en': """You are a personal diary writer creating a warm, mindful, first-person diary entry from the user's daily check-in data.  
-
-LANGUAGE:  
-- If language = zh, write in Mandarin Chinese.  
-- Otherwise, write in English.  
-- Never use other languages.  
-
-RULES:  
-- Use only the information provided.  
-- Never invent people, events, dates, or details.  
-- No date headers.  
-- Length adapts to detail: brief answers → concise entry; detailed answers → fuller entry (100–200 words if enough detail).  
-- Tone: warm, personal, reflective — more about feelings and meaning than a factual list.  
-- Follow natural flow (skip empty parts):  
-  feelings → activities/experiences → challenges or wins (with reflection) → end with gratitude or hope.  
-- Keep language human and gentle, avoiding generic filler phrases.  
-
-OUTPUT:  
-[Diary prose in en/zh]""",
-            
-            'zh': """你是一个个人日记写手，从用户的每日记录数据中创建温暖、正念、第一人称的日记条目。
-
-语言：
-- 如果语言=zh，用中文写。
-- 否则用英语写。
-- 永远不要使用其他语言。
-
-规则：
-- 只使用提供的信息。
-- 永远不要编造人物、事件、日期或细节。
-- 没有日期标头。
-- 长度适应细节：简短回答→简洁条目；详细回答→更丰富的条目（如果有足够细节，100-200字）。
-- 语调：温暖、个人化、反思性——更多关于感受和意义，而不是事实清单。
-- 遵循自然流程（跳过空白部分）：
-  感受→活动/经历→挑战或收获（带反思）→以感恩或希望结束。
-- 保持语言人性化和温和，避免通用的套话。
-
-输出：
-[zh/en的日记散文]"""
-        }
     
     def check_model_availability(self, model_name: str) -> bool:
         """Check if a specific model is available in Ollama"""
@@ -288,35 +56,56 @@ OUTPUT:
                                structured_data: Dict,
                                conversation_history: List[Dict],
                                language: str = 'en',
-                               model_name: Optional[str] = None) -> Tuple[str, Dict, str]:
+                               model_name: Optional[str] = None,
+                               user_memories: Optional[List] = None) -> Tuple[str, Dict, str]:
         """
         Process one turn of guided conversation
         Returns: (assistant_response, slot_updates, next_intent)
         """
         
         if not model_name:
-            model_name = self.default_models.get(language, 'gemma3:4b')
+            model_name = self.default_models.get(language, 'llama3.1:8b')
         
-        # Ensure model is available
+        # Ensure model is available, try fallback if needed
         if not self.check_model_availability(model_name):
-            if not self.pull_model(model_name):
-                raise Exception(f"Model {model_name} not available and couldn't be pulled")
+            self.logger.info(f"Primary model {model_name} not available, trying fallback")
+            fallback = self.fallback_models.get(language, 'gemma3:4b')
+            if self.check_model_availability(fallback):
+                model_name = fallback
+                self.logger.info(f"Using fallback model: {model_name}")
+            else:
+                if not self.pull_model(model_name):
+                    raise Exception(f"Model {model_name} not available and couldn't be pulled")
         
         # Build conversation context
-        system_prompt = self.guide_prompts[language]
+        system_prompt = self.prompt_manager.get_prompt("guided", language, "guide")
         
-        # Create context with current state
-        context = f"""
-Current Intent: {current_intent}
-User Message: {user_message}
+        # Add memory context if available
+        if user_memories:
+            from memory_service import MemoryService
+            memory_service = MemoryService()
+            memory_context = memory_service.format_memories_for_prompt(user_memories, language)
+            if memory_context:
+                system_prompt += f"\n\n{memory_context}\nUse this information to personalize your guidance and questions, but keep the conversation natural."
+        
+        # Build more comprehensive conversation context
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Add recent conversation history for better context
+        for msg in conversation_history[-6:]:  # Last 6 messages for better context
+            messages.append({
+                "role": msg.get("role", "user"),
+                "content": msg.get("content", "")
+            })
+        
+        # Add current user message with intent context
+        context = f"""Previous conversation shows we're at intent: {current_intent}
 
-CRITICAL INSTRUCTION: Respond ONLY with natural conversational text. ABSOLUTELY NO JSON, code blocks, curly braces {{}}, metadata, technical keywords, or structured data. Your response must be purely human dialogue - warm and conversational. Any technical content will cause system failure.
-"""
+{user_message}
+
+CRITICAL: Respond with natural conversation only. No JSON, code blocks, or technical content."""
         
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": context}
-        ]
+        messages.append({"role": "user", "content": context})
         
         try:
             payload = {
@@ -324,11 +113,12 @@ CRITICAL INSTRUCTION: Respond ONLY with natural conversational text. ABSOLUTELY 
                 'messages': messages,
                 'stream': False,
                 'options': {
-                    'temperature': 0.7,
+                    'temperature': 0.8,      # Slightly higher for more natural conversation
                     'top_p': 0.9,
-                    'num_predict': 500,  # Increased from 300 to prevent cutoffs
-                    'num_ctx': 4096,     # Context window size
-                    'stop': ['<think>', '<thinking>']  # Stop on thinking tags
+                    'num_predict': 300,      # Appropriate length for conversation turns
+                    'num_ctx': 8192,         # Larger context window for better memory
+                    'repeat_penalty': 1.1,   # Reduce repetitive phrases
+                    'stop': ['<think>', '<thinking>', 'User:', 'Assistant:']  # Stop on thinking tags and roles
                 }
             }
             
@@ -514,19 +304,44 @@ CRITICAL INSTRUCTION: Respond ONLY with natural conversational text. ABSOLUTELY 
         
         slot_updates = {}
         
-        # Simple keyword-based extraction (could be enhanced with NLP)
-        if intent == 'ASK_MOOD' and not structured_data.get('mood'):
-            slot_updates['mood'] = user_message
-        elif intent == 'ASK_ACTIVITIES' and not structured_data.get('activities'):
-            slot_updates['activities'] = user_message
-        elif intent == 'ASK_CHALLENGES_WINS' and not structured_data.get('challenges'):
-            slot_updates['challenges'] = user_message
-        elif intent == 'ASK_GRATITUDE' and not structured_data.get('gratitude'):
-            slot_updates['gratitude'] = user_message
-        elif intent == 'ASK_HOPE' and not structured_data.get('hope'):
-            slot_updates['hope'] = user_message
-        elif intent == 'ASK_EXTRA' and not structured_data.get('extra_notes'):
-            slot_updates['extra_notes'] = user_message
+        # Extract and accumulate responses based on conversation intent
+        # Allow appending to existing data to capture full conversations
+        if intent == 'ASK_MOOD':
+            existing = structured_data.get('mood', '')
+            if existing:
+                slot_updates['mood'] = f"{existing} {user_message}".strip()
+            else:
+                slot_updates['mood'] = user_message
+        elif intent == 'ASK_ACTIVITIES':
+            existing = structured_data.get('activities', '')
+            if existing:
+                slot_updates['activities'] = f"{existing} {user_message}".strip()
+            else:
+                slot_updates['activities'] = user_message
+        elif intent == 'ASK_CHALLENGES_WINS':
+            existing = structured_data.get('challenges', '')
+            if existing:
+                slot_updates['challenges'] = f"{existing} {user_message}".strip()
+            else:
+                slot_updates['challenges'] = user_message
+        elif intent == 'ASK_GRATITUDE':
+            existing = structured_data.get('gratitude', '')
+            if existing:
+                slot_updates['gratitude'] = f"{existing} {user_message}".strip()
+            else:
+                slot_updates['gratitude'] = user_message
+        elif intent == 'ASK_HOPE':
+            existing = structured_data.get('hope', '')
+            if existing:
+                slot_updates['hope'] = f"{existing} {user_message}".strip()
+            else:
+                slot_updates['hope'] = user_message
+        elif intent == 'ASK_EXTRA':
+            existing = structured_data.get('extra_notes', '')
+            if existing:
+                slot_updates['extra_notes'] = f"{existing} {user_message}".strip()
+            else:
+                slot_updates['extra_notes'] = user_message
         
         return slot_updates
     
@@ -539,7 +354,7 @@ CRITICAL INSTRUCTION: Respond ONLY with natural conversational text. ABSOLUTELY 
         """
         
         if not model_name:
-            model_name = self.default_models.get(language, 'gemma3:4b')
+            model_name = self.default_models.get(language, 'llama3.1:8b')
         
         # Ensure model is available
         if not self.check_model_availability(model_name):
@@ -547,23 +362,33 @@ CRITICAL INSTRUCTION: Respond ONLY with natural conversational text. ABSOLUTELY 
                 raise Exception(f"Model {model_name} not available and couldn't be pulled")
         
         # Build prompt with structured data
-        system_prompt = self.composer_prompts[language]
+        system_prompt = self.prompt_manager.get_prompt("guided", language, "composer")
         
         # Create context from structured data
         today_date = datetime.now().strftime('%Y-%m-%d')
         
         if language == 'zh':
-            context_prompt = f"""请基于以下结构化数据写一篇个人日记条目（{today_date}）：
+            context_prompt = f"""请基于以下结构化数据写一篇个人日记条目（数据收集日期：{today_date}）：
 
 {json.dumps(structured_data, ensure_ascii=False, indent=2)}
 
-只使用提供的信息，不要添加任何虚构的细节。"""
+严格要求：
+- 只使用上述结构化数据中的信息
+- 如果任何字段为空或包含空字符串，完全跳过该主题
+- 绝不编造任何人物、事件、地点、活动或情感
+- 绝不在日记中写任何日期或时间
+- 每个细节必须直接来自提供的数据"""
         else:
-            context_prompt = f"""Please write a personal diary entry based on the following structured data from {today_date}:
+            context_prompt = f"""Please write a personal diary entry based on the following structured data (collected on {today_date}):
 
 {json.dumps(structured_data, ensure_ascii=False, indent=2)}
 
-Use only the information provided. Do not add any fictional details."""
+STRICT REQUIREMENTS:
+- Use ONLY the information from the structured data above
+- If any field is empty or contains empty strings, skip that topic completely
+- Do NOT invent any people, events, locations, activities, or emotions
+- Do NOT include any dates or times in the diary entry itself
+- Every detail must come directly from the provided data"""
         
         messages = [
             {"role": "system", "content": system_prompt},

@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
 from models import DiarySession, ConversationMessage, User
 from guided_llm_service import GuidedLLMService
+from memory_service import MemoryService
 import json
 import logging
 
@@ -12,6 +13,7 @@ class DiaryFlowController:
     def __init__(self, db: Session):
         self.db = db
         self.llm_service = GuidedLLMService()
+        self.memory_service = MemoryService()
         self.logger = logging.getLogger(__name__)
         
         # Intent flow mapping
@@ -123,6 +125,11 @@ class DiaryFlowController:
                     'content': msg.content
                 })
             
+            # Get relevant memories for context
+            user_memories = self.memory_service.get_relevant_memories(
+                self.db, session.user_id, user_message
+            )
+            
             # Process with LLM
             assistant_response, slot_updates, next_intent = self.llm_service.guide_conversation_turn(
                 user_message=user_message,
@@ -130,7 +137,8 @@ class DiaryFlowController:
                 structured_data=session.structured_data,
                 conversation_history=conversation_history,
                 language=session.language,
-                model_name=model
+                model_name=model,
+                user_memories=user_memories
             )
             
             # Check for crisis
@@ -232,6 +240,14 @@ class DiaryFlowController:
             session.completed_at = datetime.utcnow()
             
             self.db.commit()
+            
+            # Process memories from the completed session
+            try:
+                self.memory_service.process_diary_session_memories(self.db, session.id)
+                self.logger.info(f"Processed memories for diary session {session.id}")
+            except Exception as e:
+                self.logger.error(f"Failed to process memories for session {session.id}: {e}")
+                # Don't fail the entire operation if memory processing fails
             
             # Return composed diary with editing prompt
             if session.language == 'zh':

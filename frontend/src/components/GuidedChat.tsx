@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
-import { guidedDiaryAPI } from '../utils/api.ts';
+import { guidedDiaryAPI, diaryAPI, unifiedDiaryAPI } from '../utils/api.ts';
 import { GuidedDiarySession, ConversationMessage, GuidedDiaryResponse } from '../types/index.ts';
 import SimpleCalendar from './SimpleCalendar.tsx';
 
@@ -20,7 +20,9 @@ const GuidedChat: React.FC<GuidedChatProps> = ({ onSwitchToLegacy }) => {
   const [selectedDateSessions, setSelectedDateSessions] = useState<any[]>([]);
   const [showHistoricalDiary, setShowHistoricalDiary] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
-  const [selectedModel, setSelectedModel] = useState('gemma3:4b');
+  const [selectedModel, setSelectedModel] = useState('llama3.1:8b');
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
   
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -214,6 +216,84 @@ const GuidedChat: React.FC<GuidedChatProps> = ({ onSwitchToLegacy }) => {
     setSelectedDate(date);
     setSelectedDateSessions(sessions);
     setShowHistoricalDiary(true);
+    setEditingEntryId(null); // Reset editing state
+    setEditingContent('');
+  };
+
+  const startEditingEntry = (entryId: string, content: string) => {
+    setEditingEntryId(entryId);
+    setEditingContent(content);
+  };
+
+  const cancelEditingEntry = () => {
+    setEditingEntryId(null);
+    setEditingContent('');
+  };
+
+  const saveEntryEdit = async (entryId: string, mode: string) => {
+    try {
+      setLoading(true);
+      
+      if (mode === 'casual') {
+        const numericId = parseInt(entryId.replace('casual_', ''));
+        await diaryAPI.editEntry(numericId, editingContent);
+      } else if (mode === 'guided') {
+        const numericId = parseInt(entryId.replace('guided_', ''));
+        await guidedDiaryAPI.editSessionDiary(numericId, editingContent);
+      }
+      
+      // Update local state
+      setSelectedDateSessions(prev => 
+        prev.map(entry => 
+          entry.id === entryId 
+            ? { ...entry, content: editingContent }
+            : entry
+        )
+      );
+      
+      setEditingEntryId(null);
+      setEditingContent('');
+    } catch (error) {
+      console.error('Error saving entry edit:', error);
+      alert(language === 'en' ? 'Failed to save changes' : '保存失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteEntry = async (entryId: string, mode: string) => {
+    const confirmMessage = language === 'en' 
+      ? 'Are you sure you want to delete this diary entry? This action cannot be undone.'
+      : '确定要删除这个日记条目吗？此操作无法撤销。';
+    
+    if (!window.confirm(confirmMessage)) return;
+    
+    try {
+      setLoading(true);
+      
+      if (mode === 'casual') {
+        const numericId = parseInt(entryId.replace('casual_', ''));
+        await diaryAPI.deleteEntry(numericId);
+      } else if (mode === 'guided') {
+        const numericId = parseInt(entryId.replace('guided_', ''));
+        await guidedDiaryAPI.deleteSession(numericId);
+      }
+      
+      // Remove from local state
+      setSelectedDateSessions(prev => 
+        prev.filter(entry => entry.id !== entryId)
+      );
+      
+      // If no entries left, close modal
+      if (selectedDateSessions.length <= 1) {
+        setShowHistoricalDiary(false);
+      }
+    } catch (error) {
+      console.error('Error deleting entry:', error);
+      alert(language === 'en' ? 'Failed to delete entry' : '删除失败');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -275,142 +355,136 @@ const GuidedChat: React.FC<GuidedChatProps> = ({ onSwitchToLegacy }) => {
     <div style={{ 
       display: 'flex', 
       height: '100vh', 
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      backgroundColor: '#f8f9fa'
+      fontFamily: 'system-ui, -apple-system, sans-serif'
     }}>
       {/* Left Sidebar - Calendar */}
       <div style={{ 
         width: '300px', 
         backgroundColor: 'white', 
-        borderRight: '1px solid #e9ecef',
-        padding: '20px'
+        borderRight: '1px solid #e0e0e0',
+        padding: '20px',
+        display: 'flex',
+        flexDirection: 'column'
       }}>
-        <h3 style={{ marginBottom: '20px', color: '#495057' }}>
-          {language === 'en' ? 'Previous Diaries' : '以前的日记'}
-        </h3>
+        <div style={{ marginBottom: '20px' }}>
+          <h3 style={{ marginBottom: '10px', color: '#333' }}>Welcome, {user?.username}!</h3>
+          <p style={{ color: '#666', fontSize: '14px' }}>{user?.email}</p>
+          <button
+            onClick={logout}
+            style={{
+              marginTop: '10px',
+              padding: '8px 16px',
+              backgroundColor: '#dc3545',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              fontSize: '14px',
+            }}
+          >
+            Logout
+          </button>
+          {onSwitchToLegacy && (
+            <button
+              onClick={onSwitchToLegacy}
+              style={{
+                marginTop: '10px',
+                marginLeft: '10px',
+                padding: '8px 16px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              {language === 'en' ? 'Try Casual Mode' : '尝试休闲模式'}
+            </button>
+          )}
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+            Language
+          </label>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px',
+              border: '1px solid #e0e0e0',
+              borderRadius: '5px',
+            }}
+          >
+            <option value="en">English</option>
+            <option value="zh">中文</option>
+          </select>
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+            AI Model
+          </label>
+          <select
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px',
+              border: '1px solid #e0e0e0',
+              borderRadius: '5px',
+            }}
+          >
+            <option value="llama3.1:8b">Llama 3.1 (8B)</option>
+            <option value="qwen3:8b">Qwen 3 (8B)</option>
+          </select>
+        </div>
+
         <SimpleCalendar 
+          language={language}
           onDateSelect={handleDateSelect}
-          apiEndpoint="/guided-diary"
         />
+
+        <button
+          onClick={startNewSession}
+          disabled={loading}
+          style={{
+            width: '100%',
+            backgroundColor: '#28a745',
+            color: 'white',
+            border: 'none',
+            padding: '12px',
+            borderRadius: '8px',
+            cursor: loading ? 'not-allowed' : 'pointer',
+            opacity: loading ? 0.5 : 1,
+            marginTop: '20px'
+          }}
+        >
+          ✨ {language === 'en' ? 'Start Fresh Session' : '开始新对话'}
+        </button>
       </div>
 
       {/* Main Chat Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#f9f9f9' }}>
         {/* Header */}
         <div style={{
           padding: '20px',
           backgroundColor: 'white',
-          borderBottom: '1px solid #e9ecef',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
+          borderBottom: '1px solid #e0e0e0'
         }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-              <div>
-                <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#667eea', fontWeight: '300' }}>Dear Me</h1>
-                <p style={{ margin: '2px 0 0 0', color: '#999', fontSize: '0.8rem', fontStyle: 'italic' }}>
-                  Be Here, Be Now, Be You
-                </p>
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <button
-              onClick={() => navigate('/')}
-              style={{
-                padding: '8px 16px',
-                border: '1px solid #667eea',
-                borderRadius: '6px',
-                backgroundColor: '#667eea',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}
-            >
-              🏠 {language === 'en' ? 'Home' : '首页'}
-            </button>
-            <button
-              onClick={startNewSession}
-              style={{
-                padding: '8px 16px',
-                border: '1px solid #28a745',
-                borderRadius: '6px',
-                backgroundColor: '#28a745',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}
-            >
-              ✨ {language === 'en' ? 'Start Fresh' : '重新开始'}
-            </button>
-            <button
-              onClick={onSwitchToLegacy}
-              style={{
-                padding: '8px 16px',
-                border: '1px solid #dee2e6',
-                borderRadius: '6px',
-                backgroundColor: 'white',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}
-            >
-              {language === 'en' ? 'Casual Mode' : '休闲模式'}
-            </button>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              style={{
-                padding: '8px',
-                border: '1px solid #dee2e6',
-                borderRadius: '6px',
-                backgroundColor: 'white',
-                marginRight: '10px'
-              }}
-            >
-              <option value="en">English</option>
-              <option value="zh">中文</option>
-            </select>
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              style={{
-                padding: '8px',
-                border: '1px solid #dee2e6',
-                borderRadius: '6px',
-                backgroundColor: 'white',
-                fontSize: '14px'
-              }}
-              title="Select AI Model"
-            >
-              <option value="gemma3:4b">Gemma 3 (4B)</option>
-              <option value="qwen3:8b">Qwen 3 (8B)</option>
-            </select>
-            <span style={{ color: '#6c757d', fontSize: '14px' }}>
-              {user?.username}
-            </span>
-            <button
-              onClick={logout}
-              style={{
-                padding: '8px 16px',
-                border: 'none',
-                borderRadius: '6px',
-                backgroundColor: '#dc3545',
-                color: 'white',
-                cursor: 'pointer'
-              }}
-            >
-              {language === 'en' ? 'Logout' : '退出'}
-            </button>
-          </div>
+          <h1 style={{ margin: 0, color: '#667eea', fontWeight: '300' }}>Dear Me</h1>
+          <p style={{ margin: '2px 0 0 0', color: '#999', fontSize: '0.8rem', fontStyle: 'italic' }}>
+            Be Here, Be Now, Be You -- in a space you call your own
+          </p>
         </div>
 
         {/* Messages Area */}
         <div style={{
           flex: 1,
           padding: '20px',
-          overflowY: 'auto',
-          backgroundColor: '#f8f9fa'
+          overflowY: 'auto'
         }}>
           {!session ? (
             <div style={{ textAlign: 'center', marginTop: '50px' }}>
@@ -446,21 +520,28 @@ const GuidedChat: React.FC<GuidedChatProps> = ({ onSwitchToLegacy }) => {
                 <div
                   key={index}
                   style={{
-                    marginBottom: '20px',
+                    marginBottom: '15px',
                     display: 'flex',
                     justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start'
                   }}
                 >
                   <div style={{
                     maxWidth: '70%',
-                    padding: '15px',
+                    padding: '12px 16px',
                     borderRadius: '18px',
-                    backgroundColor: message.role === 'user' ? '#007bff' : 'white',
-                    color: message.role === 'user' ? 'white' : '#343a40',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    lineHeight: '1.5'
+                    backgroundColor: message.role === 'user' ? '#667eea' : 'white',
+                    color: message.role === 'user' ? 'white' : '#333',
+                    border: message.role === 'assistant' ? '1px solid #e0e0e0' : 'none'
                   }}>
-                    {message.content}
+                    <p style={{ margin: 0, fontSize: '14px', textAlign: 'left' }}>{message.content}</p>
+                    <p style={{ 
+                      margin: '5px 0 0 0', 
+                      fontSize: '12px', 
+                      opacity: 0.7,
+                      textAlign: 'left'
+                    }}>
+                      {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -468,7 +549,7 @@ const GuidedChat: React.FC<GuidedChatProps> = ({ onSwitchToLegacy }) => {
               {/* Show thinking indicator when loading */}
               {loading && (
                 <div style={{
-                  marginBottom: '20px',
+                  marginBottom: '15px',
                   display: 'flex',
                   justifyContent: 'flex-start'
                 }}>
@@ -477,12 +558,12 @@ const GuidedChat: React.FC<GuidedChatProps> = ({ onSwitchToLegacy }) => {
                     padding: '12px 16px',
                     borderRadius: '18px',
                     backgroundColor: 'white',
-                    color: '#6c757d',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    lineHeight: '1.5',
-                    fontStyle: 'italic'
+                    color: '#333',
+                    border: '1px solid #e0e0e0'
                   }}>
-                    {language === 'en' ? 'Thinking...' : '思考中...'}
+                    <p style={{ margin: 0, fontSize: '14px', textAlign: 'left', fontStyle: 'italic' }}>
+                      {language === 'en' ? 'Thinking...' : '思考中...'}
+                    </p>
                   </div>
                 </div>
               )}
@@ -598,14 +679,14 @@ const GuidedChat: React.FC<GuidedChatProps> = ({ onSwitchToLegacy }) => {
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder={language === 'en' ? 'Share your thoughts...' : '分享你的想法...'}
+                placeholder={language === 'en' ? 'Type your message...' : '输入你的消息...'}
                 disabled={loading}
                 style={{
                   flex: 1,
-                  padding: '12px',
-                  border: '1px solid #dee2e6',
+                  padding: '12px 16px',
+                  border: '2px solid #e0e0e0',
                   borderRadius: '25px',
-                  fontSize: '14px',
+                  fontSize: '16px',
                   outline: 'none'
                 }}
               />
@@ -613,16 +694,18 @@ const GuidedChat: React.FC<GuidedChatProps> = ({ onSwitchToLegacy }) => {
                 onClick={sendMessage}
                 disabled={loading || !inputMessage.trim()}
                 style={{
-                  padding: '12px 20px',
-                  backgroundColor: '#007bff',
+                  backgroundColor: '#667eea',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '25px',
+                  borderRadius: '50%',
+                  width: '45px',
+                  height: '45px',
                   cursor: 'pointer',
-                  fontSize: '14px'
+                  fontSize: '18px',
+                  opacity: loading || !inputMessage.trim() ? 0.5 : 1
                 }}
               >
-                {loading ? '...' : (language === 'en' ? 'Send' : '发送')}
+                ➤
               </button>
             </div>
             
@@ -747,24 +830,137 @@ const GuidedChat: React.FC<GuidedChatProps> = ({ onSwitchToLegacy }) => {
               </button>
             </div>
             
-            {selectedDateSessions.map((session, index) => (
+            {selectedDateSessions.map((entry, index) => (
               <div key={index} style={{
-                marginBottom: '20px',
-                padding: '15px',
-                border: '1px solid #dee2e6',
-                borderRadius: '8px'
+                backgroundColor: '#f9f9f9', 
+                padding: '20px', 
+                borderRadius: '10px',
+                marginBottom: '15px',
+                lineHeight: '1.6',
+                border: '1px solid #e0e0e0',
               }}>
-                <div style={{
-                  whiteSpace: 'pre-wrap',
-                  lineHeight: '1.6',
-                  marginBottom: '10px'
-                }}>
-                  {session.final_diary || session.composed_diary}
+                {/* Mode indicator and action buttons header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  {entry.mode && (
+                    <div style={{
+                      fontSize: '11px',
+                      color: '#666',
+                      backgroundColor: entry.mode === 'guided' ? '#e3f2fd' : '#f3e5f5',
+                      padding: '3px 8px',
+                      borderRadius: '12px',
+                      fontWeight: '500'
+                    }}>
+                      {entry.mode === 'guided' 
+                        ? (language === 'en' ? '📝 Guided Mode' : '📝 引导模式')
+                        : (language === 'en' ? '💬 Casual Mode' : '💬 休闲模式')
+                      }
+                    </div>
+                  )}
+                  
+                  {/* Edit and Delete buttons */}
+                  <div style={{ display: 'flex', gap: '5px' }}>
+                    {editingEntryId === entry.id ? (
+                      <>
+                        <button
+                          onClick={() => saveEntryEdit(entry.id, entry.mode)}
+                          disabled={loading}
+                          style={{
+                            padding: '4px 8px',
+                            backgroundColor: '#28a745',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                          }}
+                        >
+                          ✓ {language === 'en' ? 'Save' : '保存'}
+                        </button>
+                        <button
+                          onClick={cancelEditingEntry}
+                          style={{
+                            padding: '4px 8px',
+                            backgroundColor: '#6c757d',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                          }}
+                        >
+                          ✕ {language === 'en' ? 'Cancel' : '取消'}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => startEditingEntry(entry.id, entry.content || entry.final_diary || entry.composed_diary)}
+                          style={{
+                            padding: '4px 8px',
+                            backgroundColor: '#007bff',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                          }}
+                        >
+                          ✏️ {language === 'en' ? 'Edit' : '编辑'}
+                        </button>
+                        <button
+                          onClick={() => deleteEntry(entry.id, entry.mode)}
+                          disabled={loading}
+                          style={{
+                            padding: '4px 8px',
+                            backgroundColor: '#dc3545',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                          }}
+                        >
+                          🗑️ {language === 'en' ? 'Delete' : '删除'}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <small style={{ color: '#6c757d' }}>
-                  {language === 'en' ? 'Completed: ' : '完成时间: '}
-                  {new Date(session.completed_at).toLocaleString()}
-                </small>
+                
+                {/* Content area */}
+                {editingEntryId === entry.id ? (
+                  <textarea
+                    value={editingContent}
+                    onChange={(e) => setEditingContent(e.target.value)}
+                    style={{
+                      width: '100%',
+                      minHeight: '120px',
+                      padding: '12px',
+                      border: '2px solid #007bff',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      lineHeight: '1.6',
+                      resize: 'vertical',
+                      fontFamily: 'inherit',
+                      outline: 'none',
+                    }}
+                    placeholder={language === 'en' ? 'Edit your diary entry...' : '编辑你的日记条目...'}
+                  />
+                ) : (
+                  <div style={{ whiteSpace: 'pre-wrap' }}>
+                    {entry.content || entry.final_diary || entry.composed_diary}
+                  </div>
+                )}
+                
+                <div style={{ 
+                  marginTop: '10px', 
+                  fontSize: '12px', 
+                  color: '#888',
+                  borderTop: '1px solid #e0e0e0',
+                  paddingTop: '10px'
+                }}>
+                  {language === 'en' ? 'Created:' : '创建时间:'} {new Date(entry.created_at || entry.completed_at).toLocaleString()}
+                </div>
               </div>
             ))}
           </div>

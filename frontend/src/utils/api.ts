@@ -101,6 +101,16 @@ export const diaryAPI = {
     const response = await api.get(`/diary/by-date/${date}`);
     return response.data;
   },
+
+  editEntry: async (entryId: number, content: string): Promise<{ success: boolean; entry: DiaryEntry }> => {
+    const response = await api.put(`/diary/entry/${entryId}`, { content });
+    return response.data;
+  },
+
+  deleteEntry: async (entryId: number): Promise<{ success: boolean; message: string }> => {
+    const response = await api.delete(`/diary/entry/${entryId}`);
+    return response.data;
+  },
 };
 
 export const guidedDiaryAPI = {
@@ -138,11 +148,33 @@ export const guidedDiaryAPI = {
     const response = await api.get(`/guided-diary-calendar/by-date/${date}`);
     return response.data;
   },
+
+  editSessionDiary: async (sessionId: number, finalDiary: string): Promise<{ success: boolean; session: any }> => {
+    const response = await api.put(`/guided-diary/session/${sessionId}/final-diary`, { final_diary: finalDiary });
+    return response.data;
+  },
+
+  deleteSession: async (sessionId: number): Promise<{ success: boolean; message: string }> => {
+    const response = await api.delete(`/guided-diary/${sessionId}/delete`);
+    return response.data;
+  },
 };
 
 export const conversationAPI = {
   getHistory: async (): Promise<{ success: boolean; conversations: Conversation[] }> => {
     const response = await api.get('/conversations');
+    return response.data;
+  },
+};
+
+export const unifiedDiaryAPI = {
+  getDates: async (): Promise<{ success: boolean; dates: string[] }> => {
+    const response = await api.get('/unified-diary/dates');
+    return response.data;
+  },
+
+  getByDate: async (date: string): Promise<{ success: boolean; entries: any[]; date: string }> => {
+    const response = await api.get(`/unified-diary/by-date/${date}`);
     return response.data;
   },
 };

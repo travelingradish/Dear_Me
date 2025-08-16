@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx';
-import { llmAPI, diaryAPI } from '../utils/api.ts';
+import { llmAPI, diaryAPI, guidedDiaryAPI, unifiedDiaryAPI } from '../utils/api.ts';
 import { Message } from '../types/index.ts';
 import SimpleCalendar from './SimpleCalendar.tsx';
 
@@ -21,7 +21,9 @@ const SimpleChat: React.FC<SimpleChatProps> = ({ onSwitchToGuided }) => {
   const [selectedDateDiaries, setSelectedDateDiaries] = useState<any[]>([]);
   const [showHistoricalDiary, setShowHistoricalDiary] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
-  const [selectedModel, setSelectedModel] = useState('gemma3:4b');
+  const [selectedModel, setSelectedModel] = useState('llama3.1:8b');
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
   
   const { user, logout } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -161,6 +163,84 @@ const SimpleChat: React.FC<SimpleChatProps> = ({ onSwitchToGuided }) => {
     setSelectedDate(date);
     setSelectedDateDiaries(entries);
     setShowHistoricalDiary(true);
+    setEditingEntryId(null); // Reset editing state
+    setEditingContent('');
+  };
+
+  const startEditingEntry = (entryId: string, content: string) => {
+    setEditingEntryId(entryId);
+    setEditingContent(content);
+  };
+
+  const cancelEditingEntry = () => {
+    setEditingEntryId(null);
+    setEditingContent('');
+  };
+
+  const saveEntryEdit = async (entryId: string, mode: string) => {
+    try {
+      setLoading(true);
+      
+      if (mode === 'casual') {
+        const numericId = parseInt(entryId.replace('casual_', ''));
+        await diaryAPI.editEntry(numericId, editingContent);
+      } else if (mode === 'guided') {
+        const numericId = parseInt(entryId.replace('guided_', ''));
+        await guidedDiaryAPI.editSessionDiary(numericId, editingContent);
+      }
+      
+      // Update local state
+      setSelectedDateDiaries(prev => 
+        prev.map(entry => 
+          entry.id === entryId 
+            ? { ...entry, content: editingContent }
+            : entry
+        )
+      );
+      
+      setEditingEntryId(null);
+      setEditingContent('');
+    } catch (error) {
+      console.error('Error saving entry edit:', error);
+      alert(language === 'en' ? 'Failed to save changes' : '保存失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteEntry = async (entryId: string, mode: string) => {
+    const confirmMessage = language === 'en' 
+      ? 'Are you sure you want to delete this diary entry? This action cannot be undone.'
+      : '确定要删除这个日记条目吗？此操作无法撤销。';
+    
+    if (!window.confirm(confirmMessage)) return;
+    
+    try {
+      setLoading(true);
+      
+      if (mode === 'casual') {
+        const numericId = parseInt(entryId.replace('casual_', ''));
+        await diaryAPI.deleteEntry(numericId);
+      } else if (mode === 'guided') {
+        const numericId = parseInt(entryId.replace('guided_', ''));
+        await guidedDiaryAPI.deleteSession(numericId);
+      }
+      
+      // Remove from local state
+      setSelectedDateDiaries(prev => 
+        prev.filter(entry => entry.id !== entryId)
+      );
+      
+      // If no entries left, close modal
+      if (selectedDateDiaries.length <= 1) {
+        setShowHistoricalDiary(false);
+      }
+    } catch (error) {
+      console.error('Error deleting entry:', error);
+      alert(language === 'en' ? 'Failed to delete entry' : '删除失败');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const containerStyle: React.CSSProperties = {
@@ -338,7 +418,7 @@ const SimpleChat: React.FC<SimpleChatProps> = ({ onSwitchToGuided }) => {
               borderRadius: '5px',
             }}
           >
-            <option value="gemma3:4b">Gemma 3 (4B)</option>
+            <option value="llama3.1:8b">Llama 3.1 (8B)</option>
             <option value="qwen3:8b">Qwen 3 (8B)</option>
           </select>
         </div>
@@ -573,10 +653,121 @@ const SimpleChat: React.FC<SimpleChatProps> = ({ onSwitchToGuided }) => {
                   borderRadius: '10px',
                   marginBottom: '15px',
                   lineHeight: '1.6',
-                  whiteSpace: 'pre-wrap',
                   border: '1px solid #e0e0e0',
                 }}>
-                  {entry.content}
+                  {/* Mode indicator and action buttons header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    {entry.mode && (
+                      <div style={{
+                        fontSize: '11px',
+                        color: '#666',
+                        backgroundColor: entry.mode === 'guided' ? '#e3f2fd' : '#f3e5f5',
+                        padding: '3px 8px',
+                        borderRadius: '12px',
+                        fontWeight: '500'
+                      }}>
+                        {entry.mode === 'guided' 
+                          ? (language === 'en' ? '📝 Guided Mode' : '📝 引导模式')
+                          : (language === 'en' ? '💬 Casual Mode' : '💬 休闲模式')
+                        }
+                      </div>
+                    )}
+                    
+                    {/* Edit and Delete buttons */}
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                      {editingEntryId === entry.id ? (
+                        <>
+                          <button
+                            onClick={() => saveEntryEdit(entry.id, entry.mode)}
+                            disabled={loading}
+                            style={{
+                              padding: '4px 8px',
+                              backgroundColor: '#28a745',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                            }}
+                          >
+                            ✓ {language === 'en' ? 'Save' : '保存'}
+                          </button>
+                          <button
+                            onClick={cancelEditingEntry}
+                            style={{
+                              padding: '4px 8px',
+                              backgroundColor: '#6c757d',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                            }}
+                          >
+                            ✕ {language === 'en' ? 'Cancel' : '取消'}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => startEditingEntry(entry.id, entry.content)}
+                            style={{
+                              padding: '4px 8px',
+                              backgroundColor: '#007bff',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                            }}
+                          >
+                            ✏️ {language === 'en' ? 'Edit' : '编辑'}
+                          </button>
+                          <button
+                            onClick={() => deleteEntry(entry.id, entry.mode)}
+                            disabled={loading}
+                            style={{
+                              padding: '4px 8px',
+                              backgroundColor: '#dc3545',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                            }}
+                          >
+                            🗑️ {language === 'en' ? 'Delete' : '删除'}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Content area */}
+                  {editingEntryId === entry.id ? (
+                    <textarea
+                      value={editingContent}
+                      onChange={(e) => setEditingContent(e.target.value)}
+                      style={{
+                        width: '100%',
+                        minHeight: '120px',
+                        padding: '12px',
+                        border: '2px solid #007bff',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        lineHeight: '1.6',
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                        outline: 'none',
+                      }}
+                      placeholder={language === 'en' ? 'Edit your diary entry...' : '编辑你的日记条目...'}
+                    />
+                  ) : (
+                    <div style={{ whiteSpace: 'pre-wrap' }}>
+                      {entry.content}
+                    </div>
+                  )}
+                  
                   <div style={{ 
                     marginTop: '10px', 
                     fontSize: '12px', 

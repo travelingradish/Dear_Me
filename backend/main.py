@@ -3,14 +3,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from datetime import datetime
 import uvicorn
 
 from database import SessionLocal, engine, Base
-from models import User, Conversation, DiaryEntry, DiarySession, ConversationMessage
+from models import User, Conversation, DiaryEntry, DiarySession, ConversationMessage, UserMemory, MemorySnapshot
 from schemas import UserCreate, UserLogin, ConversationCreate, DiaryCreate, GuidedChatMessage, DiaryEditRequest, GuidedSessionStart
 from auth import create_access_token, verify_token, get_password_hash, verify_password
 from llm_service import OllamaLLMService
 from diary_flow_controller import DiaryFlowController
+from memory_service import MemoryService
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -27,8 +29,9 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-# Initialize LLM service
+# Initialize services
 llm_service = OllamaLLMService()
+memory_service = MemoryService()
 
 # Security
 security = HTTPBearer()
@@ -120,6 +123,7 @@ async def login(user_data: UserLogin, db: Session = Depends(get_db)):
 
 @app.get("/auth/me")
 async def get_current_user_info(current_user: User = Depends(get_current_user)):
+    print(f"AUTH/ME: Current user is {current_user.id} ({current_user.username}, {current_user.email})")
     return {"id": current_user.id, "username": current_user.username, "email": current_user.email}
 
 @app.get("/llm/models/{language}")
@@ -134,13 +138,27 @@ async def create_conversation(
     db: Session = Depends(get_db)
 ):
     try:
-        # Generate LLM response
+        # Get relevant memories for context
+        user_memories = memory_service.get_relevant_memories(
+            db, current_user.id, conversation_data.message
+        )
+        
+        # Generate LLM response with memory context
         response = llm_service.generate_conversation_response(
             message=conversation_data.message,
             conversation_history=conversation_data.conversation_history,
             language=conversation_data.language,
-            model_name=conversation_data.model
+            model_name=conversation_data.model,
+            user_memories=user_memories
         )
+        
+        # Extract and store new memories from the conversation
+        full_conversation = conversation_data.message + " " + response
+        extracted_memories = memory_service.extract_memories_from_text(
+            full_conversation, current_user.id, "conversation"
+        )
+        if extracted_memories:
+            memory_service.store_memories(db, current_user.id, extracted_memories)
         
         # Save conversation to database
         conversation = Conversation(
@@ -417,6 +435,110 @@ async def get_active_guided_session(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# Memory Management Endpoints
+@app.get("/memory/summary")
+async def get_memory_summary(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get a summary of user's memories"""
+    try:
+        summary = memory_service.get_user_memory_summary(db, current_user.id)
+        return {"success": True, "summary": summary}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/memory/list")
+async def get_user_memories(
+    category: str = None,
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get list of user's memories, optionally filtered by category"""
+    try:
+        categories = [category] if category else None
+        memories = memory_service.get_relevant_memories(db, current_user.id, "", categories, limit)
+        
+        memory_data = []
+        for memory in memories:
+            memory_data.append({
+                "id": memory.id,
+                "category": memory.category,
+                "memory_key": memory.memory_key,
+                "memory_value": memory.memory_value,
+                "confidence_score": memory.confidence_score,
+                "source_type": memory.source_type,
+                "first_mentioned": memory.first_mentioned.isoformat(),
+                "last_updated": memory.last_updated.isoformat(),
+                "mention_count": memory.mention_count,
+                "is_active": memory.is_active,
+                "is_sensitive": memory.is_sensitive
+            })
+        
+        return {"success": True, "memories": memory_data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/memory/{memory_id}")
+async def update_memory(
+    memory_id: int,
+    memory_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update a specific memory"""
+    try:
+        memory = db.query(UserMemory).filter(
+            UserMemory.id == memory_id,
+            UserMemory.user_id == current_user.id
+        ).first()
+        
+        if not memory:
+            raise HTTPException(status_code=404, detail="Memory not found")
+        
+        # Update fields
+        if "memory_value" in memory_data:
+            memory.memory_value = memory_data["memory_value"]
+        if "is_active" in memory_data:
+            memory.is_active = memory_data["is_active"]
+        if "is_sensitive" in memory_data:
+            memory.is_sensitive = memory_data["is_sensitive"]
+        
+        memory.last_updated = datetime.utcnow()
+        db.commit()
+        
+        return {"success": True, "message": "Memory updated"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/memory/{memory_id}")
+async def delete_memory(
+    memory_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a specific memory"""
+    try:
+        memory = db.query(UserMemory).filter(
+            UserMemory.id == memory_id,
+            UserMemory.user_id == current_user.id
+        ).first()
+        
+        if not memory:
+            raise HTTPException(status_code=404, detail="Memory not found")
+        
+        db.delete(memory)
+        db.commit()
+        
+        return {"success": True, "message": "Memory deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Enhanced diary dates endpoint for guided sessions
 @app.get("/guided-diary-calendar/dates")
 async def get_guided_diary_dates(
@@ -474,6 +596,229 @@ async def get_guided_diary_by_date(
         
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+
+# Unified diary endpoints - combining both guided and casual modes
+@app.get("/unified-diary/dates")
+async def get_unified_diary_dates(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all dates that have diary entries from both guided sessions and casual entries"""
+    
+    # Get dates from guided diary sessions
+    guided_dates = db.query(
+        func.date(DiarySession.completed_at).label('date')
+    ).filter(
+        DiarySession.user_id == current_user.id,
+        DiarySession.is_complete == True,
+        DiarySession.completed_at.isnot(None)
+    ).distinct().subquery()
+    
+    # Get dates from casual diary entries  
+    casual_dates = db.query(
+        func.date(DiaryEntry.created_at).label('date')
+    ).filter(
+        DiaryEntry.user_id == current_user.id
+    ).distinct().subquery()
+    
+    # Union both date sets
+    all_dates = db.query(guided_dates.c.date).union(
+        db.query(casual_dates.c.date)
+    ).distinct().all()
+    
+    # Convert to list of date strings
+    date_strings = [str(date[0]) for date in all_dates]
+    
+    return {"success": True, "dates": date_strings}
+
+@app.get("/unified-diary/by-date/{date}")
+async def get_unified_diary_by_date(
+    date: str,  # Format: YYYY-MM-DD
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all diary entries (both guided and casual) for a specific date"""
+    try:
+        from datetime import datetime
+        
+        # Parse the date
+        target_date = datetime.strptime(date, '%Y-%m-%d').date()
+        
+        unified_entries = []
+        
+        # Get guided diary sessions for that date
+        guided_sessions = db.query(DiarySession).filter(
+            DiarySession.user_id == current_user.id,
+            func.date(DiarySession.completed_at) == target_date,
+            DiarySession.is_complete == True
+        ).order_by(DiarySession.completed_at.desc()).all()
+        
+        for session in guided_sessions:
+            unified_entries.append({
+                "id": f"guided_{session.id}",
+                "mode": "guided",
+                "content": session.final_diary or session.composed_diary,
+                "language": session.language,
+                "created_at": session.completed_at.isoformat(),
+                "is_crisis": session.is_crisis,
+                "structured_data": session.structured_data
+            })
+        
+        # Get casual diary entries for that date
+        casual_entries = db.query(DiaryEntry).filter(
+            DiaryEntry.user_id == current_user.id,
+            func.date(DiaryEntry.created_at) == target_date
+        ).order_by(DiaryEntry.created_at.desc()).all()
+        
+        for entry in casual_entries:
+            unified_entries.append({
+                "id": f"casual_{entry.id}",
+                "mode": "casual", 
+                "content": entry.content,
+                "language": entry.language,
+                "created_at": entry.created_at.isoformat(),
+                "answers": entry.answers,
+                "tone": entry.tone
+            })
+        
+        # Sort all entries by creation time (newest first)
+        unified_entries.sort(key=lambda x: x["created_at"], reverse=True)
+        
+        return {"success": True, "entries": unified_entries, "date": date}
+        
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+
+# Edit and Delete endpoints for diary entries
+@app.put("/diary/entry/{entry_id}")
+async def edit_diary_entry(
+    entry_id: int,
+    edit_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Edit a casual diary entry"""
+    try:
+        entry = db.query(DiaryEntry).filter(
+            DiaryEntry.id == entry_id,
+            DiaryEntry.user_id == current_user.id
+        ).first()
+        
+        if not entry:
+            raise HTTPException(status_code=404, detail="Diary entry not found")
+        
+        # Update the content
+        if "content" in edit_data:
+            entry.content = edit_data["content"]
+        
+        db.commit()
+        db.refresh(entry)
+        
+        return {"success": True, "entry": entry}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/diary/entry/{entry_id}")
+async def delete_diary_entry(
+    entry_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a casual diary entry"""
+    try:
+        entry = db.query(DiaryEntry).filter(
+            DiaryEntry.id == entry_id,
+            DiaryEntry.user_id == current_user.id
+        ).first()
+        
+        if not entry:
+            raise HTTPException(status_code=404, detail="Diary entry not found")
+        
+        db.delete(entry)
+        db.commit()
+        
+        return {"success": True, "message": "Diary entry deleted"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/guided-diary/session/{session_id}/final-diary")
+async def edit_guided_diary_final(
+    session_id: int,
+    edit_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Edit the final diary of a guided session"""
+    try:
+        session = db.query(DiarySession).filter(
+            DiarySession.id == session_id,
+            DiarySession.user_id == current_user.id
+        ).first()
+        
+        if not session:
+            raise HTTPException(status_code=404, detail="Guided diary session not found")
+        
+        if not session.is_complete:
+            raise HTTPException(status_code=400, detail="Session not complete yet")
+        
+        # Update the final diary
+        if "final_diary" in edit_data:
+            session.final_diary = edit_data["final_diary"]
+        
+        db.commit()
+        db.refresh(session)
+        
+        return {"success": True, "session": session}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/guided-diary/{session_id}/delete")
+async def delete_guided_diary_session(
+    session_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a guided diary session"""
+    print(f"DELETE ENDPOINT HIT: session_id={session_id}", flush=True)
+    try:
+        session = db.query(DiarySession).filter(
+            DiarySession.id == session_id,
+            DiarySession.user_id == current_user.id
+        ).first()
+        
+        print(f"Session found: {session is not None}, user_id: {current_user.id}", flush=True)
+        
+        if not session:
+            print(f"Session {session_id} not found for user {current_user.id}", flush=True)
+            raise HTTPException(status_code=404, detail="Guided diary session not found")
+        
+        # Delete associated conversation messages first
+        db.query(ConversationMessage).filter(
+            ConversationMessage.diary_session_id == session_id
+        ).delete()
+        
+        # Delete the session
+        db.delete(session)
+        db.commit()
+        
+        return {"success": True, "message": "Guided diary session deleted"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"DELETE ERROR: {str(e)}", flush=True)
+        import traceback
+        print(f"TRACEBACK: {traceback.format_exc()}", flush=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8001)

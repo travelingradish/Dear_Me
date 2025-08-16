@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON, Boolean, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -15,6 +15,8 @@ class User(Base):
     # Relationships
     diary_sessions = relationship("DiarySession", back_populates="user")
     diary_entries = relationship("DiaryEntry", back_populates="user")  # Keep for backward compatibility
+    memories = relationship("UserMemory", back_populates="user")
+    memory_snapshots = relationship("MemorySnapshot", back_populates="user")
 
 class DiarySession(Base):
     __tablename__ = "diary_sessions"
@@ -24,7 +26,7 @@ class DiarySession(Base):
     language = Column(String(10), default="en")
     current_phase = Column(String(20), default="guide")  # guide, compose, complete, crisis
     current_intent = Column(String(50), default="ASK_MOOD")  # ASK_MOOD, ASK_ACTIVITIES, etc.
-    structured_data = Column(JSON)  # The extracted slots: mood, activities, etc.
+    structured_data = Column(JSON, default=dict)  # The extracted slots: mood, activities, etc.
     composed_diary = Column(Text)  # Original composed diary from LLM
     final_diary = Column(Text)  # User-edited version (defaults to composed_diary)
     is_complete = Column(Boolean, default=False)
@@ -74,3 +76,37 @@ class DiaryEntry(Base):
     
     # Relationships
     user = relationship("User", back_populates="diary_entries")
+
+class UserMemory(Base):
+    __tablename__ = "user_memories"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    category = Column(String(50), nullable=False)  # personal_info, preferences, relationships, goals, challenges, interests
+    memory_key = Column(String(100), nullable=False)  # e.g., "pet_cat", "work_stress", "morning_routine"
+    memory_value = Column(Text, nullable=False)  # The actual memory content
+    confidence_score = Column(Float, default=1.0)  # 0.0 to 1.0, higher means more confident
+    source_type = Column(String(20), default="conversation")  # conversation, diary, explicit
+    first_mentioned = Column(DateTime, default=datetime.utcnow)
+    last_updated = Column(DateTime, default=datetime.utcnow)
+    mention_count = Column(Integer, default=1)  # How many times this memory was reinforced
+    is_active = Column(Boolean, default=True)  # Can be deactivated without deletion
+    is_sensitive = Column(Boolean, default=False)  # Mark sensitive information
+    
+    # Relationships
+    user = relationship("User", back_populates="memories")
+
+class MemorySnapshot(Base):
+    __tablename__ = "memory_snapshots"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    diary_session_id = Column(Integer, ForeignKey("diary_sessions.id"), nullable=True)  # Can be null for simple chat
+    extracted_memories = Column(JSON)  # List of new/updated memories from this session
+    memory_context = Column(JSON)  # Memories that were active/used in this session
+    session_summary = Column(Text)  # Brief summary of the session for memory context
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="memory_snapshots")
+    diary_session = relationship("DiarySession")

@@ -1,0 +1,9 @@
+
+# Database files
+daily_checkin.db
+daily_checkin_backup_*.db
+test_daily_checkin.db
+
+# Test files
+test_memory_*.py
+create_memory_tables.py

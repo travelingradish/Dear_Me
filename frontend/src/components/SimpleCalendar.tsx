@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { diaryAPI, guidedDiaryAPI } from '../utils/api.ts';
+import { diaryAPI, guidedDiaryAPI, unifiedDiaryAPI } from '../utils/api.ts';
 
 interface SimpleCalendarProps {
   language?: string;
   onDateSelect: (date: string, entries: any[]) => void;
-  apiEndpoint?: string; // '/diary' for legacy or '/guided-diary' for guided
+  apiEndpoint?: string; // '/diary' for legacy, '/guided-diary' for guided, '/unified-diary' for both (default)
 }
 
 const SimpleCalendar: React.FC<SimpleCalendarProps> = ({ 
   language = 'en', 
   onDateSelect, 
-  apiEndpoint = '/diary' 
+  apiEndpoint = '/unified-diary' 
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [diaryDates, setDiaryDates] = useState<string[]>([]);
@@ -22,9 +22,15 @@ const SimpleCalendar: React.FC<SimpleCalendarProps> = ({
 
   const loadDiaryDates = async () => {
     try {
-      const response = apiEndpoint === '/guided-diary' 
-        ? await guidedDiaryAPI.getDates()
-        : await diaryAPI.getDates();
+      let response;
+      if (apiEndpoint === '/guided-diary') {
+        response = await guidedDiaryAPI.getDates();
+      } else if (apiEndpoint === '/diary') {
+        response = await diaryAPI.getDates();
+      } else {
+        // Default to unified diary
+        response = await unifiedDiaryAPI.getDates();
+      }
       setDiaryDates(response.dates);
     } catch (error) {
       console.error('Error loading diary dates:', error);
@@ -36,10 +42,18 @@ const SimpleCalendar: React.FC<SimpleCalendarProps> = ({
     
     setLoading(true);
     try {
-      const response = apiEndpoint === '/guided-diary'
-        ? await guidedDiaryAPI.getByDate(date)
-        : await diaryAPI.getByDate(date);
-      onDateSelect(date, response.entries || response.sessions);
+      let response;
+      if (apiEndpoint === '/guided-diary') {
+        response = await guidedDiaryAPI.getByDate(date);
+        onDateSelect(date, response.sessions);
+      } else if (apiEndpoint === '/diary') {
+        response = await diaryAPI.getByDate(date);
+        onDateSelect(date, response.entries);
+      } else {
+        // Default to unified diary
+        response = await unifiedDiaryAPI.getByDate(date);
+        onDateSelect(date, response.entries);
+      }
     } catch (error) {
       console.error('Error loading diary for date:', error);
     } finally {

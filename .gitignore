@@ -1,0 +1,64 @@
+# Log files
+*.log
+backend/backend.log
+frontend/frontend.log
+
+# Database files
+*.db
+backend/dear_me.db
+
+# macOS system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Node modules
+node_modules/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE files
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build outputs
+/frontend/build
+/frontend/dist
+# Development files
+CLAUDE.md
+screenshot.png

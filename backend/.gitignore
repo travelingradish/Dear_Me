@@ -1,0 +1,9 @@
+
+# Database files
+dear_me.db
+dear_me_backup_*.db
+test_dear_me.db
+
+# Test files
+test_memory_*.py
+create_memory_tables.py

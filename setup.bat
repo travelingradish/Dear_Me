@@ -14,6 +14,24 @@ timeout /t 3 >nul
 echo [INFO] Setting up backend...
 cd backend
 
+echo [INFO] Creating Python virtual environment...
+if not exist "venv" (
+    python -m venv venv
+    if %errorlevel% neq 0 (
+        echo [ERROR] Failed to create virtual environment
+        pause
+        exit /b 1
+    )
+)
+
+echo [INFO] Activating virtual environment...
+call venv\Scripts\activate.bat
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to activate virtual environment
+    pause
+    exit /b 1
+)
+
 echo [INFO] Installing Python dependencies...
 pip install -r requirements.txt
 if %errorlevel% neq 0 (
@@ -23,7 +41,7 @@ if %errorlevel% neq 0 (
 )
 
 echo [INFO] Starting backend server...
-start "Backend Server" cmd /c "cd /d "%cd%" && python main.py"
+start "Backend Server" cmd /c "cd /d "%cd%" && call venv\Scripts\activate.bat && python main.py"
 cd ..
 
 echo [INFO] Setting up frontend...

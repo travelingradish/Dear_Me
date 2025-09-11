@@ -66,6 +66,32 @@ Install these three tools first:
 - **Node.js 16+**: [Download here](https://nodejs.org/)
 - **Ollama**: [Download here](https://ollama.ai/) or `brew install ollama` (macOS)
 
+#### 🤖 Download AI Model (Required - ~20 minutes)
+After installing Ollama, you need to download the AI model:
+
+1. **Open Terminal/Command Prompt**
+   - **Windows**: Press `Win + R`, type `cmd`, press Enter
+   - **macOS**: Press `Cmd + Space`, type "terminal", press Enter  
+   - **Linux**: Press `Ctrl + Alt + T`
+
+2. **Start Ollama service**:
+   ```bash
+   ollama serve
+   ```
+   ⚠️ **Keep this terminal open** - you'll see "Ollama is running" message
+
+3. **Open a new Terminal window** and download the model:
+   ```bash
+   ollama pull llama3.1:8b
+   ```
+   ⏳ **This takes ~20 minutes** and downloads ~4.7GB. The model supports both English and Chinese.
+
+4. **Verify installation**:
+   ```bash
+   ollama list
+   ```
+   You should see `llama3.1:8b` in the list.
+
 ### ⚡ One-Click Setup
 
 **Choose your operating system:**

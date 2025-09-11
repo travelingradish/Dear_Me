@@ -345,7 +345,8 @@ async def start_guided_diary(
     """Start a new guided diary conversation session"""
     try:
         flow_controller = DiaryFlowController(db)
-        session = flow_controller.start_diary_session(current_user, session_data.language, session_data.model)
+        model = getattr(session_data, 'model', 'llama3.1:8b')
+        session = flow_controller.start_diary_session(current_user, session_data.language, model)
         
         # Get the initial greeting message
         conversation_history = flow_controller.get_conversation_history(session)
@@ -360,6 +361,9 @@ async def start_guided_diary(
         }
         
     except Exception as e:
+        import traceback
+        print(f"ERROR in start_guided_diary: {str(e)}")
+        print(f"TRACEBACK: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/guided-diary/{session_id}/message")
@@ -382,8 +386,9 @@ async def send_guided_message(
             raise HTTPException(status_code=404, detail="Session not found")
         
         # Process the user message
+        model = getattr(message_data, 'model', 'llama3.1:8b')
         result = flow_controller.process_user_message(
-            session.id, message_data.message, message_data.model
+            session.id, message_data.message, model
         )
         assistant_response = result["response"]
         is_complete = result["phase_complete"]

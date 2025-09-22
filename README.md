@@ -12,7 +12,7 @@
 
 A gentle, AI-powered journaling companion offering guided reflection, casual conversations, and free-form writing. Created to support mindfulness and mental well-being, it invites you to slow down, unwind, and nurture meaningful self-reflection in a space that is entirely your own.
 
-![Dear Me](https://img.shields.io/badge/version-1.0.0--beta-blue)
+![Dear Me](https://img.shields.io/badge/version-1.0.1--beta-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-green)
 ![React](https://img.shields.io/badge/React-19.1.1-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Latest-blue)

@@ -26,7 +26,9 @@ A gentle, AI-powered journaling companion offering guided reflection, casual con
 
 ### 🤖 **Smart AI Companion**
 - **Personalized Identity**: Name your AI friend for a more intimate experience
-- **Adaptive Memory**: Learns and remembers your details across all conversations
+- **Advanced Memory System**: Enhanced contextual memory with temporal awareness and pattern recognition
+- **Intelligent Retrieval**: Sophisticated memory filtering to distinguish current vs. historical information
+- **Memory Insights**: Automatic pattern detection, evolution tracking, and relationship analysis
 - **Crisis Detection**: Supportive responses and mental health awareness
 
 ### ✍️ **Writing Enhancement**
@@ -34,9 +36,10 @@ A gentle, AI-powered journaling companion offering guided reflection, casual con
 - Smart reset to always return to your original text
 - Side-by-side comparison of original vs. improved versions
 
-### 🌍 **Multi-Language Support** 
-- **English & 中文 (Chinese)**: Powered by Llama 3.1 model
-- One-click language switching with persistent preferences
+### 🌍 **Multi-Language Support**
+- **Universal Language Support**: Powered by unified Llama 3.1:8b model for all languages
+- **Seamless Language Switching**: Natural conversation in English, Chinese, and other languages
+- **Simplified Architecture**: Single model reduces complexity while maintaining quality
 
 ### 📅 **Unified Journal Management**
 - Visual calendar interface for all your entries
@@ -54,9 +57,11 @@ A gentle, AI-powered journaling companion offering guided reflection, casual con
 
 - **Backend**: FastAPI (Python) with SQLAlchemy ORM and SQLite database
 - **Frontend**: React TypeScript with responsive design and unified interface
-- **AI Integration**: Local Ollama models for natural language processing
+- **AI Integration**: Local Ollama with universal Llama 3.1:8b model for all languages
+- **Memory System**: Advanced contextual memory with temporal awareness and pattern recognition
 - **Authentication**: JWT-based security with bcrypt password hashing
 - **Data Flow**: RESTful APIs connecting React frontend to FastAPI backend
+- **Testing**: Comprehensive pytest suite with unit, integration, and live testing capabilities
 
 ## 🚀 Quick Start
 
@@ -84,13 +89,15 @@ After installing Ollama, you need to download the AI model:
    ```bash
    ollama pull llama3.1:8b
    ```
-   ⏳ **This takes ~20 minutes** and downloads ~4.7GB. The model supports both English and Chinese.
+   ⏳ **This takes ~20 minutes** and downloads ~4.7GB. This universal model supports all languages including English and Chinese.
 
 4. **Verify installation**:
    ```bash
    ollama list
    ```
    You should see `llama3.1:8b` in the list.
+
+⚠️ **Important**: Keep the first terminal with `ollama serve` running while using Dear Me.
 
 ### ⚡ One-Click Setup
 
@@ -138,6 +145,30 @@ After the first setup, just run the same command:
 
 The AI adapts to your communication style and remembers important details about your life, creating meaningful conversations that evolve over time.
 
+## 🧠 Advanced Memory System
+
+**Dear Me** features a sophisticated memory system that creates truly personalized conversations:
+
+### 🎯 **Contextual Memory Intelligence**
+- **Temporal Awareness**: Distinguishes between current conversations and historical memories
+- **Memory Type Classification**: Separates factual information (relationships, personal details) from temporal preferences (interests, goals)
+- **Age-Based Relevance**: Automatically applies temporal penalties to outdated information
+- **Real-Time Correction**: Instantly updates incorrect memories when corrected by users
+
+### 🔍 **Smart Memory Retrieval**
+- **Pattern Recognition**: Advanced regex and keyword-based memory extraction across 6 categories
+- **Relevance Scoring**: Sophisticated algorithms to find the most contextually relevant memories
+- **Memory Limits**: Intelligent filtering to prevent information overload (max 5 relevant memories per conversation)
+- **Category Organization**: Organized memory storage across personal_info, relationships, interests, challenges, goals, and preferences
+
+### 📊 **Memory Insights & Analysis**
+- **Evolution Tracking**: Monitors how your thoughts, goals, and preferences change over time
+- **Contradiction Detection**: Identifies conflicting information and suggests clarification
+- **Pattern Analysis**: Recognizes recurring themes and important life patterns
+- **Gap Identification**: Suggests conversation topics based on missing memory categories
+
+This creates conversations that feel natural and personal, as if talking to a friend who truly knows and remembers you.
+
 ## 🎨 UI Features
 
 ### Beautiful Design Elements
@@ -169,11 +200,32 @@ The AI adapts to your communication style and remembers important details about 
 - **Caching Strategy**: Local storage for auth tokens
 
 ### Quality Assurance
-- **Comprehensive Testing**: Robust testing across backend and frontend
+- **Comprehensive Testing**: Robust testing across backend and frontend with pytest suite
+- **Memory System Validation**: Dedicated testing for memory retrieval, temporal filtering, and context accuracy
 - **Error Handling**: Graceful error management and user feedback
 - **Input Validation**: Secure data validation and sanitization
 - **Code Quality**: Clean, maintainable codebase with consistent standards
 - **Performance Monitoring**: Optimized response times and efficient operation
+
+## 🔧 Recent Improvements (September 2025)
+
+### 🎯 **Major Memory System Overhaul**
+- **Fixed Critical Memory Bug**: Resolved issue where memory objects weren't properly converted to strings for LLM processing
+- **Enhanced Temporal Filtering**: Improved distinction between current conversations and historical memories
+- **Real-Time Memory Correction**: Added ability to instantly update incorrect memories when users provide corrections
+- **Memory Type Classification**: Implemented factual vs. temporal memory categories with appropriate aging policies
+
+### 🧪 **Testing & Quality Improvements**
+- **Comprehensive Test Suite**: Added extensive pytest coverage for memory system, API endpoints, and core functionality
+- **Memory Validation Tests**: Created dedicated tests to verify memory retrieval accuracy and temporal filtering
+- **Bug Detection**: Identified and resolved 25+ actual implementation issues through rigorous testing
+- **Integration Testing**: Full-stack testing with actual Ollama LLM integration
+
+### 🚀 **Performance & Reliability**
+- **Improved Error Handling**: Enhanced debugging and error reporting throughout the application
+- **Schema Validation**: Fixed API schema mismatches and improved data type consistency
+- **Memory Efficiency**: Optimized memory retrieval to prevent information overload (5-memory limit)
+- **Conversation Context**: Better handling of conversation state and session management
 
 ## 🤝 Contributing
 

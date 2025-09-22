@@ -199,22 +199,38 @@ async def create_conversation(
         # Get relevant memories for context with time awareness
         current_time = datetime.now()  # Use local time instead of UTC
         user_memories = memory_service.get_relevant_memories(
-            current_user.id, conversation_data.message, db, 
+            current_user.id, conversation_data.message, db,
             current_time=current_time, conversation_type="current"
         )
-        
+
+        # Debug logging for memories
+        print(f"MEMORY DEBUG: User query: {conversation_data.message}")
+        print(f"MEMORY DEBUG: Found {len(user_memories)} memories:")
+        for i, memory in enumerate(user_memories, 1):
+            print(f"  {i}. [{memory.category}] {memory.memory_value}")
+
         # Generate LLM response with memory context
         character_name = current_user.ai_character_name or "AI Assistant"
+
+        # Debug log the LLM call
+        print(f"LLM DEBUG: Calling LLM with {len(user_memories)} memories, character: {character_name}")
+
+        # Convert memory objects to strings for LLM
+        memory_strings = [memory.memory_value for memory in user_memories] if user_memories else None
+
         response = llm_service.generate_conversation_response(
             message=conversation_data.message,
             conversation_history=conversation_data.conversation_history,
             language=conversation_data.language,
             model_name=conversation_data.model,
-            user_memories=user_memories,
+            user_memories=memory_strings,
             character_name=character_name,
             user_age=get_user_age(current_user),
             current_time=current_time
         )
+
+        # Debug log the LLM response
+        print(f"LLM DEBUG: LLM responded with: {response[:200]}...")
         
         # Extract and store new memories from USER MESSAGE ONLY (not AI response)
         extracted_memories = memory_service.extract_memories_from_text(
@@ -234,8 +250,11 @@ async def create_conversation(
         db.commit()
         
         return {"success": True, "response": response}
-        
+
     except Exception as e:
+        import traceback
+        logging.error(f"Error in /llm/conversation: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/diary/generate")
@@ -527,6 +546,126 @@ async def get_active_guided_session(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# Deep Agent with Enhanced Memory Integration
+@app.post("/deep-agent/{session_id}/message")
+async def process_deep_agent_message(
+    session_id: int,
+    message: GuidedChatMessage,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Process message through the deep agent system with contextual memory integration
+    and dynamic follow-up question generation
+    """
+    try:
+        from app.services.deep_agent_service import DeepAgentService
+        from app.services.contextual_memory_service import ContextualMemoryService
+
+        # Verify session belongs to current user
+        session = db.query(DiarySession).filter(
+            DiarySession.id == session_id,
+            DiarySession.user_id == current_user.id
+        ).first()
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Initialize deep agent service
+        deep_agent = DeepAgentService(db)
+        contextual_memory = ContextualMemoryService()
+
+        # Get enhanced memory context
+        memory_context = contextual_memory.get_contextual_memories_with_insights(
+            user_id=current_user.id,
+            current_message=message.content,
+            db=db,
+            conversation_history=None,  # We can add this later
+            limit=10
+        )
+
+        # Process through deep agent
+        result = deep_agent.process_conversation(session_id, message.content)
+
+        # Combine results
+        return {
+            "success": True,
+            "response": result["response"],
+            "insights": result["insights"],
+            "memory_context": {
+                "active_memories": memory_context["memories"],
+                "insights": memory_context["insights"],
+                "follow_up_questions": memory_context["follow_up_questions"],
+                "memory_gaps": memory_context["memory_gaps"],
+                "context_summary": memory_context["context_summary"]
+            },
+            "metadata": result["metadata"],
+            "session_status": {
+                "current_phase": session.current_phase,
+                "is_complete": session.is_complete,
+                "is_crisis": session.is_crisis
+            }
+        }
+
+    except ImportError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Deep agent service not available: {str(e)}"
+        )
+    except Exception as e:
+        import logging
+        logging.error(f"Error in deep agent processing: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Deep agent processing error: {str(e)}")
+
+@app.post("/deep-agent/analyze-memory-context")
+async def analyze_memory_context(
+    request: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Analyze memory context for a given message without processing through full conversation flow
+    Useful for testing memory integration
+    """
+    try:
+        from app.services.contextual_memory_service import ContextualMemoryService
+
+        contextual_memory = ContextualMemoryService()
+
+        message_content = request.get("message", "")
+        if not message_content:
+            raise HTTPException(status_code=400, detail="Message content is required")
+
+        # Get enhanced memory context
+        memory_analysis = contextual_memory.get_contextual_memories_with_insights(
+            user_id=current_user.id,
+            current_message=message_content,
+            db=db,
+            limit=15
+        )
+
+        return {
+            "success": True,
+            "message_analyzed": message_content,
+            "memory_analysis": memory_analysis,
+            "summary": {
+                "memories_found": len(memory_analysis["memories"]),
+                "insights_generated": len(memory_analysis["insights"]),
+                "follow_up_questions": len(memory_analysis["follow_up_questions"]),
+                "memory_gaps": len(memory_analysis["memory_gaps"])
+            }
+        }
+
+    except ImportError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Contextual memory service not available: {str(e)}"
+        )
+    except Exception as e:
+        import logging
+        logging.error(f"Error in memory context analysis: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Memory analysis error: {str(e)}")
 
 # Memory Management Endpoints
 @app.get("/memory/summary")

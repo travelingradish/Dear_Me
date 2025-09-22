@@ -70,6 +70,7 @@ class ConversationCreate(BaseModel):
     message: str
     conversation_history: List[Dict[str, Any]] = []
     language: str = "en"
+    model: str = "llama3.1:8b"
 
 class ConversationResponse(BaseModel):
     id: int

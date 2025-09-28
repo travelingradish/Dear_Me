@@ -264,12 +264,12 @@ async def generate_diary(
     db: Session = Depends(get_db)
 ):
     try:
-        # Generate diary entry
+        # Generate diary entry using existing LLM service
         diary_content = llm_service.generate_diary_entry(
-            answers=diary_data.answers,
             conversation_history=diary_data.conversation_history,
             language=diary_data.language,
-            tone=diary_data.tone
+            user_age=get_user_age(current_user),
+            ai_character_name=current_user.ai_character_name or "AI Assistant"
         )
         
         # Save diary entry
@@ -285,8 +285,12 @@ async def generate_diary(
         db.commit()
         
         return {"success": True, "diary": diary_content, "entry_id": diary_entry.id}
-        
+
     except Exception as e:
+        import traceback
+        error_details = f"Diary generation error: {str(e)}\nTraceback: {traceback.format_exc()}"
+        print(f"DIARY ERROR: {error_details}")
+        logging.error(error_details)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/conversations")
@@ -392,26 +396,57 @@ async def send_guided_message(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Send a message in guided diary conversation"""
+    """Send a message in guided diary conversation with enhanced graph-based routing"""
     try:
         # Validate message is not empty
         if not message_data.message or message_data.message.strip() == "":
             raise HTTPException(status_code=422, detail="Message cannot be empty")
-        
+
         flow_controller = DiaryFlowController(db)
         session = flow_controller.get_session_by_id(session_id, current_user.id)
-        
+
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
-        
-        # Process the user message
-        model = getattr(message_data, 'model', 'llama3.1:8b')
-        result = flow_controller.process_user_message(
-            session.id, message_data.message, model
-        )
+
+        # Integrate GraphConversationService for enhanced conversation routing
+        try:
+            from app.services.graph_conversation_service import GraphConversationService
+
+            # Use hybrid approach: Graph service for routing, flow controller for session management
+            graph_service = GraphConversationService(db)
+
+            # Get graph-based insights and contextual memory analysis
+            graph_result = graph_service.process_conversation(session_id, message_data.message)
+
+            # Use graph insights to enhance the flow controller decision
+            enhanced_context = {
+                "graph_insights": graph_result.get("insights", {}),
+                "memory_context": graph_result.get("metadata", {}),
+                "emotional_state": graph_result.get("insights", {}).get("emotional_state", "neutral")
+            }
+
+            # Process through enhanced flow controller with graph context
+            model = getattr(message_data, 'model', 'llama3.1:8b')
+            result = flow_controller.process_user_message_with_context(
+                session.id, message_data.message, model, enhanced_context
+            )
+
+            # If enhanced method doesn't exist, fallback to original
+            if result is None:
+                result = flow_controller.process_user_message(
+                    session.id, message_data.message, model
+                )
+
+        except ImportError:
+            # Fallback if GraphConversationService is not available
+            model = getattr(message_data, 'model', 'llama3.1:8b')
+            result = flow_controller.process_user_message(
+                session.id, message_data.message, model
+            )
+
         assistant_response = result["response"]
         is_complete = result["phase_complete"]
-        
+
         # Refresh session object to get updated state after message processing
         db.refresh(session)
         
@@ -547,20 +582,20 @@ async def get_active_guided_session(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Deep Agent with Enhanced Memory Integration
-@app.post("/deep-agent/{session_id}/message")
-async def process_deep_agent_message(
+# Graph Conversation Service with Enhanced Memory Integration
+@app.post("/graph-conversation/{session_id}/message")
+async def process_graph_conversation_message(
     session_id: int,
     message: GuidedChatMessage,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Process message through the deep agent system with contextual memory integration
+    Process message through the graph conversation system with contextual memory integration
     and dynamic follow-up question generation
     """
     try:
-        from app.services.deep_agent_service import DeepAgentService
+        from app.services.graph_conversation_service import GraphConversationService
         from app.services.contextual_memory_service import ContextualMemoryService
 
         # Verify session belongs to current user
@@ -572,8 +607,8 @@ async def process_deep_agent_message(
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
-        # Initialize deep agent service
-        deep_agent = DeepAgentService(db)
+        # Initialize graph conversation service
+        graph_conversation = GraphConversationService(db)
         contextual_memory = ContextualMemoryService()
 
         # Get enhanced memory context
@@ -585,8 +620,8 @@ async def process_deep_agent_message(
             limit=10
         )
 
-        # Process through deep agent
-        result = deep_agent.process_conversation(session_id, message.content)
+        # Process through graph conversation service
+        result = graph_conversation.process_conversation(session_id, message.content)
 
         # Combine results
         return {
@@ -611,14 +646,14 @@ async def process_deep_agent_message(
     except ImportError as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Deep agent service not available: {str(e)}"
+            detail=f"Graph conversation service not available: {str(e)}"
         )
     except Exception as e:
         import logging
-        logging.error(f"Error in deep agent processing: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Deep agent processing error: {str(e)}")
+        logging.error(f"Error in graph conversation processing: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Graph conversation processing error: {str(e)}")
 
-@app.post("/deep-agent/analyze-memory-context")
+@app.post("/graph-conversation/analyze-memory-context")
 async def analyze_memory_context(
     request: dict,
     current_user: User = Depends(get_current_user),

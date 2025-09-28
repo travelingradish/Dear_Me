@@ -136,14 +136,18 @@ class OllamaLLMService:
             if user_age:
                 conversation_prompt += self._get_age_appropriate_context(user_age, language)
             
-            # Add memory context if available
+            # Add memory context if available (with temporal awareness)
             if user_memories:
                 if language == 'zh':
-                    memory_intro = "\n\n关于用户的已知信息："
+                    memory_intro = "\n\n关于用户的已知信息（来自之前的对话，不是当前情况）："
+                    memory_warning = "\n注意：这些是历史记忆，不是当前的情况。请根据当前对话内容回应，只在直接相关时提及历史信息。"
                     conversation_prompt += memory_intro + "\n".join([f"- {memory}" for memory in user_memories[-10:]])  # Last 10 memories
+                    conversation_prompt += memory_warning
                 else:
-                    memory_intro = "\n\nWhat I know about the user:"
+                    memory_intro = "\n\nBackground information about the user (from previous conversations, NOT current situation):"
+                    memory_warning = "\nIMPORTANT: These are historical memories, not current events. Focus on the current conversation and only reference past information when directly relevant."
                     conversation_prompt += memory_intro + "\n".join([f"- {memory}" for memory in user_memories[-10:]])  # Last 10 memories
+                    conversation_prompt += memory_warning
             
             # Build messages
             messages = [{"role": "system", "content": conversation_prompt}]

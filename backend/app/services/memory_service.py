@@ -472,9 +472,18 @@ class MemoryService:
         
         # If no context provided, return recent high-confidence memories (but filtered)
         if not context or not context.strip():
-            return self._filter_memories_by_context_type(all_memories[:limit * 2], conversation_type, current_time)[:limit]
+            # For vague queries, be more strict about temporal relevance
+            filtered_memories = self._filter_memories_by_context_type(all_memories[:limit * 3], conversation_type, current_time)
+            # Additional temporal filter for vague queries - exclude memories older than 24 hours
+            recent_memories = []
+            for memory in filtered_memories:
+                temporal_relevance = self._calculate_temporal_relevance_multiplier(memory, current_time)
+                if temporal_relevance > 0.3:  # Only include memories less than ~24 hours old for vague queries
+                    recent_memories.append(memory)
+            return recent_memories[:limit]
         
         # Enhanced relevance scoring with improved temporal awareness
+        # Higher scores = more relevant memories (fresher memories get higher multipliers)
         scored_memories = []
         context_lower = context.lower()
         context_words = set(context_lower.split())
@@ -488,7 +497,7 @@ class MemoryService:
 
         # Define conversation intent keywords to understand context better
         mood_keywords = {'feel', 'feeling', 'mood', 'emotional', 'happy', 'sad', 'angry', 'excited', 'tired', 'stressed', 'calm', 'anxious'}
-        activity_keywords = {'did', 'went', 'work', 'school', 'meeting', 'exercise', 'run', 'walk', 'eat', 'cook', 'watch', 'read', 'play'}
+        activity_keywords = {'did', 'went', 'work', 'school', 'meeting', 'exercise', 'run', 'walk', 'eat', 'cook', 'watch', 'read', 'play', 'stretching', 'stretch', 'yoga', 'fitness', 'workout'}
         relationship_keywords = {'friend', 'family', 'partner', 'colleague', 'mom', 'dad', 'wife', 'husband', 'boyfriend', 'girlfriend', 'cat', 'dog', 'pet'}
         challenge_keywords = {'difficult', 'hard', 'problem', 'challenge', 'struggle', 'win', 'success', 'achievement', 'accomplish'}
 
@@ -511,24 +520,44 @@ class MemoryService:
             memory_words = set(memory.memory_value.lower().split())
             memory_content_lower = memory.memory_value.lower()
 
-            # Apply temporal penalty first - NEW IMPROVEMENT
-            temporal_penalty = self._calculate_temporal_penalty(memory, current_time)
+            # Calculate temporal relevance multiplier (fresher = higher score)
+            temporal_relevance = self._calculate_temporal_relevance_multiplier(memory, current_time)
 
             # Check if memory is time-specific (contains time references)
             memory_has_time_refs = any(word in memory_words for word in time_keywords)
 
-            # IMPROVED TEMPORAL FILTERING: Skip old temporal memories unless highly relevant
+            # TEMPORAL FILTERING: Skip old temporal memories unless highly relevant
             memory_type = self._classify_memory_type(memory)
-            if memory_type == 'temporal' and temporal_penalty < 0.5:
-                # Skip old temporal memories unless directly mentioned
-                word_overlap = len(context_words & memory_words)
-                if word_overlap < 2:  # Less than 2 word overlap
-                    continue
+            if memory_type == 'temporal' and temporal_relevance < 0.5:
+                # For very old memories (relevance < 0.2), apply much stricter filtering
+                if temporal_relevance < 0.2:
+                    # Very old memories (>2 days) should almost never be included
+                    # Only allow if conversation is SPECIFICALLY about that old event
+                    word_overlap = len(context_words & memory_words)
+                    # Require very high word overlap AND high confidence for very old memories
+                    if word_overlap < 3 or memory.confidence_score < 0.9:
+                        continue
+                else:
+                    # For moderately old memories (0.2-0.5 relevance), require some word overlap
+                    word_overlap = len(context_words & memory_words)
+                    if word_overlap < 2:  # Need at least 2 matching words for old memories
+                        continue
 
-            # 1. Direct word overlap (weighted by temporal penalty)
+            # ACTIVITY FILTER: Skip old activity memories in activity contexts
+            if context_type == 'activity':
+                is_activity_memory = any(word in memory.memory_value.lower() for word in
+                                       ['watching', 'doing', 'activities', 'playing', 'working on'])
+                if is_activity_memory and temporal_relevance < 0.1:
+                    # Skip old activity memories (under 10% relevance) unless highly relevant
+                    word_overlap = len(context_words & memory_words)
+                    if word_overlap < 3:  # Need strong word overlap for very old activities
+                        continue
+
+            # 1. Direct word overlap (weighted by temporal relevance)
             word_overlap = len(context_words & memory_words)
             if word_overlap > 0:
-                relevance_score += word_overlap * 0.4 * temporal_penalty
+                # More word overlap + fresher memory = higher relevance score
+                relevance_score += word_overlap * 0.4 * temporal_relevance
 
             # 2. Enhanced category relevance based on context type
             category_bonus = 0
@@ -541,26 +570,39 @@ class MemoryService:
             elif context_type == 'challenge' and memory.category in ['goals', 'challenges']:
                 category_bonus = 0.5
 
-            relevance_score += category_bonus * temporal_penalty
+            # Category bonus is also weighted by temporal relevance
+            relevance_score += category_bonus * temporal_relevance
 
             # 3. Semantic relevance - check for related concepts
             if context_type == 'mood':
                 emotion_indicators = ['feel', 'emotion', 'mood', 'happy', 'sad', 'stress', 'calm', 'love', 'hate', 'enjoy', 'like', 'dislike']
                 if any(indicator in memory_content_lower for indicator in emotion_indicators):
-                    relevance_score += 0.4 * temporal_penalty
+                    relevance_score += 0.4 * temporal_relevance
             elif context_type == 'relationship':
                 # Boost memories that mention relationship words
                 if any(word in memory_content_lower for word in relationship_keywords):
-                    relevance_score += 0.5 * temporal_penalty
+                    relevance_score += 0.5 * temporal_relevance
 
-            # 4. Penalize cross-category irrelevance
-            if context_type == 'activity' and memory.category == 'personal_info':
-                relevance_score *= 0.3
+            # 4. Enhanced cross-category irrelevance filtering
+            if context_type == 'activity':
+                # For activity context, heavily penalize unrelated memories
+                if memory.category == 'personal_info' and word_overlap == 0:
+                    relevance_score *= 0.1  # Much stricter penalty
+                elif memory.category == 'interests' and word_overlap == 0:
+                    # Check if it's actually related to the activity
+                    activity_related = any(word in memory_content_lower for word in activity_keywords)
+                    if not activity_related:
+                        relevance_score *= 0.2
             elif context_type == 'relationship' and memory.category in ['interests', 'preferences']:
                 relevance_score *= 0.4
 
-            # 5. Consider confidence score (weighted by temporal penalty)
-            relevance_score += memory.confidence_score * 0.3 * temporal_penalty
+            # Add strict filtering for completely unrelated content
+            if word_overlap == 0 and category_bonus == 0:
+                # No word overlap and no category relevance - likely irrelevant
+                relevance_score *= 0.1
+
+            # 5. Consider confidence score (weighted by temporal relevance)
+            relevance_score += memory.confidence_score * 0.3 * temporal_relevance
 
             # 6. Boost very recent and high-confidence memories slightly
             if memory.last_updated and (current_time - memory.last_updated).total_seconds() < 7200:  # 2 hours
@@ -574,16 +616,20 @@ class MemoryService:
         scored_memories.sort(key=lambda x: x[1], reverse=True)
         relevant_memories = [memory for memory, score in scored_memories[:min(limit, 5)]]  # Cap at 5 memories max
 
-        # If no relevant memories found, return a small set of high-confidence recent memories
+        # If no relevant memories found, be very conservative with fallback
         if not relevant_memories:
-            # Return fewer fallback memories and prioritize recent factual memories
-            fallback_memories = []
-            for memory in all_memories[:10]:  # Check top 10
-                if self._classify_memory_type(memory) == 'factual' or self._calculate_temporal_penalty(memory, current_time) > 0.8:
-                    fallback_memories.append(memory)
-                    if len(fallback_memories) >= 3:
-                        break
-            return fallback_memories
+            # Only return fallback memories if the context is very general
+            if len(context_words) <= 2 or context_type == 'general':
+                fallback_memories = []
+                for memory in all_memories[:5]:  # Check fewer memories
+                    if self._classify_memory_type(memory) == 'factual' and self._calculate_temporal_relevance_multiplier(memory, current_time) > 0.9:
+                        fallback_memories.append(memory)
+                        if len(fallback_memories) >= 1:  # Only 1 fallback memory
+                            break
+                return fallback_memories
+            else:
+                # For specific context, return empty if no relevant memories
+                return []
 
         return relevant_memories
     
@@ -821,45 +867,69 @@ class MemoryService:
 
     def _classify_memory_type(self, memory: UserMemory) -> str:
         """Classify memory as factual or temporal"""
+        # First check content for strong temporal indicators (overrides category)
+        temporal_indicators = [
+            'today', 'yesterday', 'this morning', 'this afternoon', 'last week', 'recently',
+            'went to', 'had lunch', 'had dinner', 'had breakfast', 'did', 'was doing', 'feeling', 'felt',
+            'watching', 'doing', 'activities', 'playing', 'working on', 'currently',
+            'visited', 'drove to', 'walked to', 'shopping', 'bought', 'ordered',
+            '今天', '昨天', '早上', '下午', '上周', '最近', '去了', '吃了', '做了', '感觉', '正在'
+        ]
+
+        content_lower = memory.memory_value.lower()
+
+        # Strong temporal indicators override category classification
+        if any(indicator in content_lower for indicator in temporal_indicators):
+            return 'temporal'
+
+        # Category-based classification for non-temporal content
         if memory.category in self.factual_categories:
             return 'factual'
         elif memory.category in self.temporal_categories:
             return 'temporal'
         else:
-            # Check content for temporal indicators
-            temporal_indicators = [
-                'today', 'yesterday', 'this morning', 'this afternoon', 'last week', 'recently',
-                'went to', 'had lunch', 'did', 'was doing', 'feeling', 'felt',
-                '今天', '昨天', '早上', '下午', '上周', '最近', '去了', '吃了', '做了', '感觉'
-            ]
-
-            content_lower = memory.memory_value.lower()
-            if any(indicator in content_lower for indicator in temporal_indicators):
-                return 'temporal'
-
             return 'factual'
 
-    def _calculate_temporal_penalty(self, memory: UserMemory, current_time: datetime) -> float:
-        """Calculate penalty for temporal memories based on age"""
+    def _calculate_temporal_relevance_multiplier(self, memory: UserMemory, current_time: datetime) -> float:
+        """
+        Calculate how relevant a temporal memory is based on its age.
+
+        Returns a multiplier between 0.01 and 1.0:
+        - 1.0 = 100% relevant (very fresh memory)
+        - 0.5 = 50% relevant (moderately old)
+        - 0.01 = 1% relevant (very old, almost irrelevant)
+
+        Fresher memories get HIGHER multipliers (more relevant)
+        Older memories get LOWER multipliers (less relevant)
+        """
         if not memory.last_updated:
-            return 0.5  # Moderate penalty for memories without timestamps
+            return 0.5  # Moderate relevance for memories without timestamps
 
         memory_type = self._classify_memory_type(memory)
 
         if memory_type == 'factual':
-            return 1.0  # No penalty for factual memories
+            return 1.0  # Factual memories remain fully relevant over time
 
-        # For temporal memories, apply age-based penalty
+        # For temporal memories, calculate age-based relevance multiplier
         age_hours = (current_time - memory.last_updated).total_seconds() / 3600
 
-        if age_hours < 2:
-            return 1.0  # No penalty for very recent memories
+        # Activity memories are more time-sensitive than general temporal memories
+        is_activity_memory = any(word in memory.memory_value.lower() for word in
+                               ['watching', 'doing', 'activities', 'playing', 'working on'])
+
+        if age_hours < 1:
+            return 1.0  # 100% relevant - very fresh (under 1 hour)
+        elif age_hours < 6:
+            return 0.9  # 90% relevant - same morning (under 6 hours)
         elif age_hours < 24:
-            return 0.8  # Small penalty for same-day memories
-        elif age_hours < 168:  # 1 week
-            return 0.4  # Large penalty for memories older than 1 day
+            # Activities become much less relevant after same day
+            return 0.3 if is_activity_memory else 0.6  # 30% vs 60% relevant
+        elif age_hours < 48:  # 2 days
+            # Activities from yesterday should rarely be relevant
+            return 0.05 if is_activity_memory else 0.3  # 5% vs 30% relevant
         else:
-            return 0.1  # Heavy penalty for memories older than 1 week
+            # Old activities should almost never be relevant
+            return 0.01 if is_activity_memory else 0.1  # 1% vs 10% relevant
 
     def track_conversation_context(self, db: Session, user_id: int, session_id: int, context_updates: Dict[str, Any]) -> None:
         """Track conversation-specific context and corrections"""

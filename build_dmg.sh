@@ -43,8 +43,8 @@ echo ""
 echo "[4/6] Creating installation scripts..."
 mkdir -p "$BUILD_DIR/installers"
 
-# Create the main install script
-cat > "$BUILD_DIR/install_dependencies.sh" << 'INSTALL_SCRIPT'
+# Create the main install script (.command extension for double-click execution)
+cat > "$BUILD_DIR/install_dependencies.command" << 'INSTALL_SCRIPT'
 #!/bin/bash
 # Install Dear Me dependencies (Ollama, Node.js, Python 3.13)
 # This script will prompt for your password and install prerequisites
@@ -119,7 +119,7 @@ echo "  open /Applications/Dear\\ Me.app"
 echo ""
 INSTALL_SCRIPT
 
-chmod +x "$BUILD_DIR/install_dependencies.sh"
+chmod +x "$BUILD_DIR/install_dependencies.command"
 
 # Create quick-start README
 cat > "$BUILD_DIR/README.txt" << 'README_TEXT'
@@ -135,8 +135,8 @@ STEP 1: Drag to Applications
 
 STEP 2: Install Dependencies (First Time Only)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• Double-click "install_dependencies.sh"
-• A Terminal window will open
+• Double-click "install_dependencies.command"
+• A Terminal window will automatically open
 • Follow the prompts (you may need to enter your password)
 • This downloads and installs:
   ✓ Ollama (AI Model Server)
@@ -222,7 +222,7 @@ try:
 
     draw.text((50, 160), "Installation Instructions:", fill=(44, 62, 80), font=text_font)
     draw.text((70, 190), "1. Drag \"Dear Me.app\" to Applications", fill=(52, 73, 94))
-    draw.text((70, 220), "2. Double-click \"install_dependencies.sh\"", fill=(52, 73, 94))
+    draw.text((70, 220), "2. Double-click \"install_dependencies.command\"", fill=(52, 73, 94))
     draw.text((70, 250), "3. Launch from Applications", fill=(52, 73, 94))
     draw.text((70, 280), "4. Enjoy journaling!", fill=(52, 73, 94))
 

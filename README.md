@@ -17,6 +17,36 @@ A gentle, AI-powered journaling companion offering guided reflection, casual con
 ![React](https://img.shields.io/badge/React-19.1.1-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Latest-blue)
 
+## 📥 Download Now
+
+### 🍎 **macOS Users - Easy One-Click Installation**
+
+[**⬇️ Download Dear_Me_1.0.0.dmg**](https://github.com/yourusername/Dear_Me/releases/download/v1.0.0/Dear_Me_1.0.0.dmg)
+
+**Installation takes ~15 minutes (first time), then just double-click to launch!**
+
+1. Download the DMG file above
+2. Open it and drag "Dear Me.app" to Applications
+3. Run `install_dependencies.sh` (first time only)
+4. Open Dear Me from Applications
+5. Start journaling! 📝
+
+⏱️ **Subsequent launches**: 30 seconds (everything cached)
+
+---
+
+## 🌍 Platform Support
+
+| Platform | Status | Version |
+|----------|--------|---------|
+| **macOS** | ✅ Available | v1.0.0 |
+| **Windows** | 📅 Coming Soon | Q3 2026 |
+| **Linux** | 📅 Planned | Future |
+
+*Currently, Dear Me is only available for macOS 10.13 or later. Windows and Linux support are planned for future releases.*
+
+---
+
 ## ✨ Features
 
 ### 🎯 **Three Journaling Modes**

@@ -2,6 +2,8 @@
 
 ## ⚠️ Important Notes
 
+**Pre-Release Status:** This is v1.0.0-beta, an early access release. Everything works great, but we're actively gathering feedback. Please [report issues](https://github.com/travelingradish/Dear_Me/issues) to help us improve!
+
 **Age Recommendation:** At this stage, Dear Me is only recommended for adults. While I've started building age-appropriateness controls, they are still experimental. Please do not use this with children or adolescents.
 
 **Mental Health Disclaimer:** This app is not a replacement for professional mental health care. It is simply a companion to help us unwind, reflect, and capture our feelings in a private space. If you are struggling, please seek support from a qualified psychologist, psychiatrist, or healthcare provider.
@@ -249,6 +251,31 @@ This creates conversations that feel natural and personal, as if talking to a fr
 - **Input Validation**: Secure data validation and sanitization
 - **Code Quality**: Clean, maintainable codebase with consistent standards
 - **Performance Monitoring**: Optimized response times and efficient operation
+
+## 📋 Pre-Release Notes (v1.0.0-beta)
+
+### What's Stable ✅
+- **Core journaling functionality** - All three modes work reliably
+- **AI conversations** - Memory system and responses are solid
+- **Installation process** - One-click DMG installer works smoothly
+- **Data persistence** - Your entries are saved and safe
+- **Privacy** - Everything runs locally, no cloud sync
+
+### What Might Change 🔧
+- **UI/UX improvements** - Based on user feedback
+- **Memory system refinements** - Performance and accuracy improvements
+- **Feature additions** - Based on user requests
+- **Performance optimizations** - Ongoing improvements
+
+### How to Report Issues
+Found something that doesn't work right? Please help us improve:
+1. [Open a GitHub Issue](https://github.com/travelingradish/Dear_Me/issues)
+2. Describe what happened
+3. Include your macOS version and any error messages
+
+Your feedback is invaluable! 🙏
+
+---
 
 ## 🔧 Recent Improvements (September 2025)
 

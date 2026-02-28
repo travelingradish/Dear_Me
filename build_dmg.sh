@@ -1,14 +1,14 @@
 #!/bin/bash
 # Build DMG Installer for Dear Me
 # Usage: bash build_dmg.sh
-# Creates: Dear_Me_1.0.0.dmg (complete installer with all dependencies bundled)
+# Creates: Dear_Me_1.0.0_macOS.dmg (complete installer with all dependencies bundled)
 
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BUILD_DIR="$SCRIPT_DIR/dmg_build"
 VERSION="1.0.0"
-DMG_NAME="Dear_Me_${VERSION}.dmg"
+DMG_NAME="Dear_Me_${VERSION}_macOS.dmg"
 DMG_VOLUME_NAME="Dear Me"
 
 echo "================================"

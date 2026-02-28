@@ -6,6 +6,7 @@ import { GuidedDiarySession, ConversationMessage, GuidedDiaryResponse } from '..
 import SimpleCalendar from './SimpleCalendar.tsx';
 import DiaryModal from './DiaryModal.tsx';
 import Sidebar from './Sidebar.tsx';
+import '../styles/responsive.css';
 
 interface GuidedChatProps {
   onSwitchToLegacy: () => void;
@@ -488,11 +489,7 @@ const GuidedChat: React.FC<GuidedChatProps> = ({ onSwitchToLegacy, onSwitchToFre
   };
 
   return (
-    <div style={{ 
-      display: 'flex', 
-      height: '100vh', 
-      fontFamily: 'system-ui, -apple-system, sans-serif'
-    }}>
+    <div className="app-layout">
       {/* Shared Sidebar */}
       <Sidebar
         currentMode="guided"
@@ -569,13 +566,9 @@ const GuidedChat: React.FC<GuidedChatProps> = ({ onSwitchToLegacy, onSwitchToFre
       </Sidebar>
 
       {/* Main Chat Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#f9f9f9' }}>
+      <div className="main-content">
         {/* Header */}
-        <div style={{
-          padding: '20px',
-          backgroundColor: 'white',
-          borderBottom: '1px solid #e0e0e0'
-        }}>
+        <div className="main-header">
           <h1 style={{ margin: 0, color: '#667eea', fontWeight: '300' }}>Dear Me</h1>
           <p style={{ margin: '2px 0 0 0', color: '#999', fontSize: '0.8rem', fontStyle: 'italic' }}>
             Be Here, Be Now, Be You -- in a space you call your own
@@ -627,14 +620,15 @@ const GuidedChat: React.FC<GuidedChatProps> = ({ onSwitchToLegacy, onSwitchToFre
                     justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start'
                   }}
                 >
-                  <div style={{
-                    maxWidth: '70%',
-                    padding: '12px 16px',
-                    borderRadius: '18px',
-                    backgroundColor: message.role === 'user' ? '#667eea' : 'white',
-                    color: message.role === 'user' ? 'white' : '#333',
-                    border: message.role === 'assistant' ? '1px solid #e0e0e0' : 'none'
-                  }}>
+                  <div
+                    className="message-bubble"
+                    style={{
+                      padding: '12px 16px',
+                      borderRadius: '18px',
+                      backgroundColor: message.role === 'user' ? '#667eea' : 'white',
+                      color: message.role === 'user' ? 'white' : '#333',
+                      border: message.role === 'assistant' ? '1px solid #e0e0e0' : 'none'
+                    }}>
                     <p style={{ margin: 0, fontSize: '14px', textAlign: 'left' }}>{message.content}</p>
                     <p style={{ 
                       margin: '5px 0 0 0', 
@@ -655,14 +649,15 @@ const GuidedChat: React.FC<GuidedChatProps> = ({ onSwitchToLegacy, onSwitchToFre
                   display: 'flex',
                   justifyContent: 'flex-start'
                 }}>
-                  <div style={{
-                    maxWidth: '70%',
-                    padding: '12px 16px',
-                    borderRadius: '18px',
-                    backgroundColor: 'white',
-                    color: '#333',
-                    border: '1px solid #e0e0e0'
-                  }}>
+                  <div
+                    className="message-bubble"
+                    style={{
+                      padding: '12px 16px',
+                      borderRadius: '18px',
+                      backgroundColor: 'white',
+                      color: '#333',
+                      border: '1px solid #e0e0e0'
+                    }}>
                     <p style={{ margin: 0, fontSize: '14px', textAlign: 'left', fontStyle: 'italic' }}>
                       {language === 'en' ? 'Thinking...' : '思考中...'}
                     </p>

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for the new Deep Agent with Enhanced Memory Integration
+Test script for the new Graph Conversation Service with Enhanced Memory Integration
 
 This script tests the contextual memory retrieval and follow-up question generation
 without requiring the full LLM integration.
@@ -22,15 +22,15 @@ def create_test_user(db: Session) -> User:
     """Create a test user with some memories"""
 
     # Check if test user already exists
-    existing_user = db.query(User).filter(User.username == "deepagent_test").first()
+    existing_user = db.query(User).filter(User.username == "graphconv_test").first()
     if existing_user:
         return existing_user
 
     # Create new test user
     user = User(
-        username="deepagent_test",
+        username="graphconv_test",
         hashed_password="test_hash",
-        ai_character_name="Deep Assistant"
+        ai_character_name="Graph Assistant"
     )
     db.add(user)
     db.commit()
@@ -78,7 +78,7 @@ def create_test_memories(db: Session, user: User) -> None:
 def test_contextual_memory_analysis():
     """Test the contextual memory analysis functionality"""
 
-    print("=== Testing Deep Agent Contextual Memory Integration ===\n")
+    print("=== Testing Graph Conversation Service Contextual Memory Integration ===\n")
 
     # Create database session
     db = SessionLocal()
@@ -253,10 +253,10 @@ if __name__ == "__main__":
     # Ensure database tables exist
     Base.metadata.create_all(bind=engine)
 
-    print("🚀 Starting Deep Agent Memory Integration Tests...\n")
+    print("🚀 Starting Graph Conversation Service Memory Integration Tests...\n")
 
     # Run tests
     test_contextual_memory_analysis()
     test_memory_pattern_analysis()
 
-    print("✅ Deep Agent testing completed!")
+    print("✅ Graph Conversation Service testing completed!")

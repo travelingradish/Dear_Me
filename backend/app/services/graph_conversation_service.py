@@ -1,5 +1,5 @@
 """
-Deep Agent Service with LangGraph Integration
+Graph Conversation Service with LangGraph Integration
 
 This service implements contextual memory integration and dynamic follow-up questioning
 using LangGraph's graph-based conversation flow, replacing the linear state machine
@@ -22,7 +22,7 @@ from app.services.guided_llm_service import GuidedLLMService
 
 
 class ConversationState(TypedDict):
-    """State structure for the deep agent conversation"""
+    """State structure for the graph conversation service"""
     messages: List[BaseMessage]
     user_id: int
     session_id: int
@@ -37,9 +37,9 @@ class ConversationState(TypedDict):
     is_crisis: bool
 
 
-class DeepAgentService:
+class GraphConversationService:
     """
-    Deep Agent Service that uses LangGraph for sophisticated conversation flow
+    Graph Conversation Service that uses LangGraph for sophisticated conversation flow
     with contextual memory integration and dynamic follow-up questioning
     """
 
@@ -93,7 +93,7 @@ class DeepAgentService:
 
     def process_conversation(self, session_id: int, user_message: str) -> Dict[str, Any]:
         """
-        Process a conversation message through the deep agent system
+        Process a conversation message through the graph conversation system
 
         Args:
             session_id: The diary session ID
@@ -305,7 +305,7 @@ class DeepAgentService:
             extracted_memories = self.memory_service.extract_memories_from_text(
                 user_message,
                 state["user_id"],
-                "deep_agent_conversation"
+                "graph_conversation"
             )
 
             if extracted_memories:

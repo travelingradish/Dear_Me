@@ -1,7 +1,7 @@
 import logging
 import re
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple, Any
 from sqlalchemy.orm import Session
 from app.models.models import User, UserMemory, MemorySnapshot, DiarySession, ConversationMessage
@@ -184,7 +184,7 @@ class MemoryService:
                 # Update existing memory
                 existing_memory.memory_value = memory_data['memory_value']
                 existing_memory.confidence_score = min(1.0, existing_memory.confidence_score + 0.1)  # Increase confidence
-                existing_memory.last_updated = datetime.utcnow()
+                existing_memory.last_updated = datetime.now(timezone.utc)
                 existing_memory.mention_count += 1
                 stored_memories.append(existing_memory)
             else:
@@ -333,7 +333,7 @@ class MemoryService:
             'total_memories': len(memories),
             'by_category': {},
             'high_confidence': len([m for m in memories if m.confidence_score >= 0.8]),
-            'recent_memories': len([m for m in memories if m.last_updated >= datetime.utcnow() - timedelta(days=7)])
+            'recent_memories': len([m for m in memories if m.last_updated >= datetime.now(timezone.utc) - timedelta(days=7)])
         }
         
         for memory in memories:
@@ -428,7 +428,7 @@ class MemoryService:
                 # Update existing memory
                 existing_memory.memory_value = memory_data['memory_value']
                 existing_memory.confidence_score = min(1.0, existing_memory.confidence_score + 0.1)
-                existing_memory.last_updated = datetime.utcnow()
+                existing_memory.last_updated = datetime.now(timezone.utc)
                 existing_memory.mention_count += 1
                 stored_memories.append(existing_memory)
             else:
@@ -450,7 +450,7 @@ class MemoryService:
     def get_relevant_memories(self, user_id: int, context: str, db_session: Session, limit: int = 10, current_time: datetime = None, conversation_type: str = "current") -> List[UserMemory]:
         """Get contextually relevant memories with improved relevance scoring"""
         if not current_time:
-            current_time = datetime.now()  # Use local time instead of UTC
+            current_time = datetime.now(timezone.utc)  # Use timezone-aware UTC
             
         query = db_session.query(UserMemory).filter(
             UserMemory.user_id == user_id,
@@ -605,8 +605,27 @@ class MemoryService:
             relevance_score += memory.confidence_score * 0.3 * temporal_relevance
 
             # 6. Boost very recent and high-confidence memories slightly
-            if memory.last_updated and (current_time - memory.last_updated).total_seconds() < 7200:  # 2 hours
-                relevance_score += 0.2
+            if memory.last_updated:
+                # Handle timezone-aware vs naive datetime comparison
+                mem_time = memory.last_updated
+                if mem_time.tzinfo is None:
+                    mem_time = mem_time.replace(tzinfo=timezone.utc)
+                curr_time = current_time if current_time.tzinfo else current_time.replace(tzinfo=timezone.utc)
+
+                if (curr_time - mem_time).total_seconds() < 7200:  # 2 hours
+                    relevance_score += 0.2
+
+            # 7. FREQUENCY-BASED IMPORTANCE SCORING (NEW)
+            # Memories mentioned 3+ times are clearly important to the user
+            importance_boost = 0
+            if memory.mention_count >= 5:
+                importance_boost = 5.0  # Very important - mentioned 5+ times
+                self.logger.debug(f"Very important memory (5+ mentions): {memory.memory_value[:50]}")
+            elif memory.mention_count >= 3:
+                importance_boost = 3.0  # Important - mentioned 3+ times
+                self.logger.debug(f"Important memory (3+ mentions): {memory.memory_value[:50]}")
+
+            relevance_score += importance_boost
 
             # INCREASED MINIMUM THRESHOLD for better filtering
             if relevance_score > 0.5:  # Higher threshold (was 0.2)
@@ -690,7 +709,7 @@ class MemoryService:
             
             # For mood-only contexts, limit to recent emotional memories
             if is_mood_only and memory.category not in ['personal_info'] and memory.last_updated:
-                days_old = (datetime.utcnow() - memory.last_updated).days
+                days_old = (datetime.now(timezone.utc) - memory.last_updated).days
                 if days_old > 30:  # Skip older memories for simple mood updates
                     should_include = False
             
@@ -725,10 +744,10 @@ class MemoryService:
             UserMemory.user_id == user_id,
             UserMemory.is_active == True
         ).all()
-        
+
         # Create snapshot data
         extracted_memories = []  # Empty for this test interface
-        session_summary = f"Memory snapshot created at {datetime.utcnow()}"
+        session_summary = f"Memory snapshot created at {datetime.now(timezone.utc)}"
         
         # Create the snapshot manually instead of calling parent method
         snapshot = MemorySnapshot(
@@ -774,7 +793,7 @@ class MemoryService:
                 if category == 'relationships' or 'relationships' in memory.category:
                     # For relationships, update the memory value directly
                     memory.memory_value = memory.memory_value.replace(old_value, new_value)
-                    memory.last_updated = datetime.utcnow()
+                    memory.last_updated = datetime.now(timezone.utc)
                     memory.confidence_score = min(1.0, memory.confidence_score + 0.1)  # Boost confidence for corrected info
                     self.logger.info(f"Corrected relationship memory: {old_value} -> {new_value}")
                 else:
@@ -845,7 +864,7 @@ class MemoryService:
             if existing_memory:
                 # Update existing memory
                 existing_memory.memory_value = new_memory_value
-                existing_memory.last_updated = datetime.utcnow()
+                existing_memory.last_updated = datetime.now(timezone.utc)
                 existing_memory.confidence_score = 0.95  # Very high confidence for explicit corrections
             else:
                 # Create new relationship memory
@@ -910,26 +929,40 @@ class MemoryService:
         if memory_type == 'factual':
             return 1.0  # Factual memories remain fully relevant over time
 
+        # Handle timezone-aware vs naive datetime comparison (for transition period)
+        memory_time = memory.last_updated
+        if memory_time.tzinfo is None:
+            # Convert naive datetime to UTC-aware for comparison
+            memory_time = memory_time.replace(tzinfo=timezone.utc)
+
+        # Ensure current_time is timezone-aware
+        if current_time.tzinfo is None:
+            current_time = current_time.replace(tzinfo=timezone.utc)
+
         # For temporal memories, calculate age-based relevance multiplier
-        age_hours = (current_time - memory.last_updated).total_seconds() / 3600
+        age_hours = (current_time - memory_time).total_seconds() / 3600
 
         # Activity memories are more time-sensitive than general temporal memories
         is_activity_memory = any(word in memory.memory_value.lower() for word in
                                ['watching', 'doing', 'activities', 'playing', 'working on'])
 
-        if age_hours < 1:
-            return 1.0  # 100% relevant - very fresh (under 1 hour)
-        elif age_hours < 6:
-            return 0.9  # 90% relevant - same morning (under 6 hours)
-        elif age_hours < 24:
-            # Activities become much less relevant after same day
-            return 0.3 if is_activity_memory else 0.6  # 30% vs 60% relevant
-        elif age_hours < 48:  # 2 days
-            # Activities from yesterday should rarely be relevant
-            return 0.05 if is_activity_memory else 0.3  # 5% vs 30% relevant
-        else:
-            # Old activities should almost never be relevant
-            return 0.01 if is_activity_memory else 0.1  # 1% vs 10% relevant
+        # REVISED TEMPORAL DECAY CURVE - More user-friendly and less aggressive
+        # User feedback: 1 day = critical, 2 days = high impact, 3+ mentions = important
+
+        if age_hours < 24:  # 0-1 day (CRITICAL window)
+            return 1.0  # 100% relevant - happened today/last 24 hours
+        elif age_hours < 72:  # 1-3 days (HIGH IMPACT window)
+            # Much gentler decay for 1-3 day old memories
+            return 0.7 if is_activity_memory else 0.8  # 70-80% relevant
+        elif age_hours < 168:  # 3-7 days (one week)
+            # Still quite relevant for general memories
+            return 0.4 if is_activity_memory else 0.6  # 40-60% relevant
+        elif age_hours < 720:  # 7-30 days (one month)
+            # Background context - still accessible
+            return 0.2 if is_activity_memory else 0.3  # 20-30% relevant
+        else:  # 30+ days
+            # Archive tier - low but not zero relevance
+            return 0.05 if is_activity_memory else 0.1  # 5-10% relevant
 
     def track_conversation_context(self, db: Session, user_id: int, session_id: int, context_updates: Dict[str, Any]) -> None:
         """Track conversation-specific context and corrections"""
@@ -946,7 +979,7 @@ class MemoryService:
 
                 # Update with new context
                 session.structured_data['memory_corrections'].update(context_updates)
-                session.last_updated = datetime.utcnow()
+                session.last_updated = datetime.now(timezone.utc)
 
                 db.commit()
                 self.logger.info(f"Updated conversation context for session {session_id}")

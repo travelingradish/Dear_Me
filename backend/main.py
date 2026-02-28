@@ -4,7 +4,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import uvicorn
 import logging
@@ -25,7 +25,7 @@ app = FastAPI(title="Daily Check-in API", version="2.0.0")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # React dev server
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "*"],  # Local dev + mobile WiFi access
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
     allow_headers=["*"],
@@ -197,7 +197,7 @@ async def create_conversation(
 ):
     try:
         # Get relevant memories for context with time awareness
-        current_time = datetime.now()  # Use local time instead of UTC
+        current_time = datetime.now(timezone.utc)  # Use timezone-aware UTC
         user_memories = memory_service.get_relevant_memories(
             current_user.id, conversation_data.message, db,
             current_time=current_time, conversation_type="current"
@@ -427,12 +427,18 @@ async def send_guided_message(
 
             # Process through enhanced flow controller with graph context
             model = getattr(message_data, 'model', 'llama3.1:8b')
-            result = flow_controller.process_user_message_with_context(
-                session.id, message_data.message, model, enhanced_context
-            )
-
-            # If enhanced method doesn't exist, fallback to original
-            if result is None:
+            try:
+                # Try enhanced method if available
+                if hasattr(flow_controller, 'process_user_message_with_context'):
+                    result = flow_controller.process_user_message_with_context(
+                        session.id, message_data.message, model, enhanced_context
+                    )
+                else:
+                    result = flow_controller.process_user_message(
+                        session.id, message_data.message, model
+                    )
+            except (AttributeError, TypeError):
+                # Fallback to original method
                 result = flow_controller.process_user_message(
                     session.id, message_data.message, model
                 )

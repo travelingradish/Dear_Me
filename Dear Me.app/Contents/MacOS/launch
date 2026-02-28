@@ -1,0 +1,5 @@
+#!/bin/bash
+# Opens Terminal.app with the Dear Me.command script
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+COMMAND_FILE="$SCRIPT_DIR/../../../Dear Me.command"
+open -a Terminal "$COMMAND_FILE"

@@ -4,6 +4,7 @@ import { freeEntryAPI, unifiedDiaryAPI, guidedDiaryAPI, diaryAPI } from '../util
 import SimpleCalendar from './SimpleCalendar.tsx';
 import DiaryModal from './DiaryModal.tsx';
 import Sidebar from './Sidebar.tsx';
+import '../styles/responsive.css';
 
 interface FreeEntryProps {
   onSwitchToGuided?: () => void;
@@ -422,7 +423,7 @@ export default function FreeEntry({ onSwitchToGuided, onSwitchToSimple }: FreeEn
   // This prevents issues with partial text capture during typing
 
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div className="app-layout">
       <Sidebar
         currentMode="free_entry"
         onSwitchToGuided={onSwitchToGuided}
@@ -709,13 +710,9 @@ export default function FreeEntry({ onSwitchToGuided, onSwitchToSimple }: FreeEn
       </Sidebar>
 
       {/* Main Content Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div className="main-content">
         {/* Header */}
-        <div style={{
-          padding: '20px',
-          backgroundColor: 'white',
-          borderBottom: '1px solid #e0e0e0',
-        }}>
+        <div className="main-header">
           <div style={{ textAlign: 'center' }}>
             <h1 style={{ 
               margin: 0, 
@@ -749,7 +746,7 @@ export default function FreeEntry({ onSwitchToGuided, onSwitchToSimple }: FreeEn
         </div>
 
         {/* Writing Area */}
-        <div style={{ flex: 1, padding: '20px', backgroundColor: '#f8f9fa', position: 'relative' }}>
+        <div style={{ flex: 1, padding: '20px', backgroundColor: '#f8f9fa', position: 'relative', minWidth: 0 }}>
           <div style={{ height: '100%', position: 'relative' }}>
             <textarea
               value={currentText}

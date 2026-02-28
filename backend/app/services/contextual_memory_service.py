@@ -5,7 +5,7 @@ This service enhances the existing MemoryService with sophisticated contextual
 retrieval and follow-up question generation based on memory patterns and user history.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple, Any
 import re
 import json
@@ -434,7 +434,7 @@ class ContextualMemoryService(MemoryService):
 
             # Recency boost
             if memory.last_updated:
-                days_old = (datetime.utcnow() - memory.last_updated).days
+                days_old = (datetime.now(timezone.utc) - memory.last_updated).days
                 if days_old < 7:
                     score += 3
                 elif days_old < 30:

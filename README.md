@@ -229,6 +229,8 @@ This creates conversations that feel natural and personal, as if talking to a fr
 
 ## 🤝 Contributing
 
+Refer to the [Repository Guidelines](AGENTS.md) before opening a pull request.
+
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
@@ -251,4 +253,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Dear Me** — *Your gentle companion, built with ❤️  for unpacking, reflection, and growth in your own sacred space*
-

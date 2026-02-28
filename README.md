@@ -99,31 +99,44 @@ After installing Ollama, you need to download the AI model:
 
 ⚠️ **Important**: Keep the first terminal with `ollama serve` running while using Dear Me.
 
-### ⚡ One-Click Setup
+### ⚡ One-Click Setup - Non-Technical Users
 
-**Choose your operating system:**
+#### 🍎 macOS (Recommended - Professional Installer)
 
-#### Windows
-1. Double-click `setup.bat`
-2. Wait for setup to complete
-3. Your app opens at http://localhost:3000
+**For non-technical users, we provide a professional macOS installer:**
 
-#### macOS/Linux
-1. Open Terminal in the project folder
-2. Run: `./setup.sh`
-3. Your app opens at http://localhost:3000
+1. **Download** `Dear_Me_1.0.0.dmg` from this repository
+2. **Open the .dmg file** - Finder window appears
+3. **Drag "Dear Me.app"** to the Applications folder
+4. **Double-click `install_dependencies.sh`** - Terminal opens
+   - Installs Ollama, Node.js, and Python 3.13 automatically
+   - Takes ~10 minutes on first run
+5. **Launch** - Open Applications → Double-click "Dear Me"
+6. **Done!** Your browser opens to http://localhost:3000
 
-#### Python (All Platforms)
-1. Run: `python setup.py`
-2. Your app opens at http://localhost:3000
+✨ **Next time**, just double-click "Dear Me.app" in Applications - everything starts in ~30 seconds!
 
-**That's it!** The script handles everything: downloading AI models, installing dependencies, and starting all services.
+**Additional Options:**
+- **Desktop Launcher**: Copy `Dear Me.command` to your Desktop for quick access
+- **Phone Access**: Look in Terminal for the WiFi IP (e.g., `http://192.168.x.x:3000`)
+
+---
+
+#### 🖥️ Terminal Setup (For Developers)
+
+If you prefer to use Terminal or are on Linux:
+
+1. **Open Terminal** in the project folder
+2. **Run**: `./setup.sh`
+3. **Your app** opens at http://localhost:3000
+
+The script handles everything automatically.
 
 ### 🔄 Daily Use
-After the first setup, just run the same command:
-- **Windows**: Double-click `setup.bat`
-- **macOS/Linux**: `./setup.sh`  
-- **Python**: `python setup.py`
+
+**macOS**: Double-click "Dear Me.app" in Applications (30 seconds)
+
+**Terminal**: Run `./setup.sh` (2-3 minutes)
 
 ### 🎨 Get Started
 1. **Create your account** - just username and password, no email required
@@ -229,7 +242,7 @@ This creates conversations that feel natural and personal, as if talking to a fr
 
 ## 🤝 Contributing
 
-Refer to the [Repository Guidelines](AGENTS.md) before opening a pull request.
+Thank you for your interest in contributing to Dear Me!
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)

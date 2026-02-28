@@ -5,6 +5,7 @@ import { Message } from '../types/index.ts';
 import SimpleCalendar from './SimpleCalendar.tsx';
 import DiaryModal from './DiaryModal.tsx';
 import Sidebar from './Sidebar.tsx';
+import '../styles/responsive.css';
 
 interface SimpleChatProps {
   onSwitchToGuided?: () => void;
@@ -414,7 +415,7 @@ const SimpleChat: React.FC<SimpleChatProps> = ({ onSwitchToGuided, onSwitchToFre
   };
 
   return (
-    <div style={containerStyle}>
+    <div className="app-layout">
       {/* Shared Sidebar */}
       <Sidebar
         currentMode="casual"
@@ -446,9 +447,9 @@ const SimpleChat: React.FC<SimpleChatProps> = ({ onSwitchToGuided, onSwitchToFre
       </Sidebar>
 
       {/* Main Chat */}
-      <div style={mainStyle}>
+      <div className="main-content">
         {/* Header */}
-        <div style={headerStyle}>
+        <div className="main-header" style={headerStyle}>
           <h1 style={{ margin: 0, color: '#667eea', fontWeight: '300' }}>Dear Me</h1>
           <p style={{ margin: '2px 0 0 0', color: '#999', fontSize: '0.8rem', fontStyle: 'italic' }}>
             Be Here, Be Now, Be You -- in a space you call your own
@@ -459,7 +460,7 @@ const SimpleChat: React.FC<SimpleChatProps> = ({ onSwitchToGuided, onSwitchToFre
         <div style={messagesStyle}>
           {messages.map((message) => (
             <div key={message.id} style={messageStyle(message.sender)}>
-              <div style={bubbleStyle(message.sender)}>
+              <div className="message-bubble" style={bubbleStyle(message.sender)}>
                 <p style={{ margin: 0, fontSize: '14px', textAlign: 'left' }}>{message.content}</p>
                 <p style={{ 
                   margin: '5px 0 0 0', 
@@ -475,7 +476,7 @@ const SimpleChat: React.FC<SimpleChatProps> = ({ onSwitchToGuided, onSwitchToFre
           
           {loading && (
             <div style={messageStyle('assistant')}>
-              <div style={bubbleStyle('assistant')}>
+              <div className="message-bubble" style={bubbleStyle('assistant')}>
                 <p style={{ margin: 0, fontSize: '14px', textAlign: 'left' }}>
                   {language === 'en' ? 'Thinking...' : '思考中...'}
                 </p>

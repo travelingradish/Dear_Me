@@ -8,8 +8,8 @@ SECRET_KEY = "your-secret-key-change-this-in-production"  # In production, use e
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30 * 24 * 60  # 30 days
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Password hashing - using argon2 instead of bcrypt to avoid version conflicts
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 def get_password_hash(password: str) -> str:
     """Hash a password"""

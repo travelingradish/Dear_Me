@@ -1,0 +1,249 @@
+/* Mobile Responsive Layout - Android-first design */
+
+/* App layout wrapper */
+.app-layout {
+  display: flex;
+  height: 100vh;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Sidebar base styles */
+.sidebar {
+  width: 300px;
+  min-width: 300px;
+  background-color: white;
+  border-right: 1px solid #e0e0e0;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  transition: transform 0.3s ease;
+  z-index: 100;
+}
+
+/* Main content area */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #f9f9f9;
+  min-width: 0; /* prevent flex overflow */
+}
+
+/* Header area in main content */
+.main-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: white;
+}
+
+/* Message bubble responsive */
+.message-bubble {
+  max-width: 70%;
+}
+
+/* Hamburger button — hidden on desktop */
+.hamburger-btn {
+  display: none;
+}
+
+/* Mobile bottom nav — hidden on desktop */
+.mobile-bottom-nav {
+  display: none;
+}
+
+/* Sidebar overlay — hidden on desktop */
+.sidebar-overlay {
+  display: none;
+}
+
+/* ================================
+   MOBILE BREAKPOINT (< 768px)
+================================ */
+@media (max-width: 768px) {
+
+  /* Sidebar slides off-screen by default on mobile */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    min-width: 280px;
+    transform: translateX(-100%);
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
+    z-index: 200;
+    padding-top: 60px; /* room for hamburger button */
+    padding-bottom: 60px; /* room for bottom nav */
+  }
+
+  /* Sidebar open state on mobile */
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  /* Dark overlay behind open sidebar */
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.4);
+    z-index: 150;
+  }
+
+  /* Hamburger button — fixed top-left, always visible on mobile */
+  .hamburger-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 300;
+    width: 44px;
+    height: 44px;
+    background-color: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    font-size: 20px;
+  }
+
+  /* Main content: full width on mobile, padding for bottom nav */
+  .main-content {
+    padding-bottom: 60px;
+  }
+
+  /* Header gets left padding so title isn't hidden behind hamburger */
+  .main-header {
+    padding-left: 68px !important;
+    padding-top: 20px !important;
+    padding-bottom: 16px !important;
+  }
+
+  /* Message bubbles — wider on small screens */
+  .message-bubble {
+    max-width: 88%;
+  }
+
+  /* Mobile bottom nav bar */
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background-color: white;
+    border-top: 1px solid #e0e0e0;
+    z-index: 100;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  .mobile-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 10px;
+    color: #666;
+    gap: 2px;
+    min-height: 44px;
+    padding: 4px 0;
+  }
+
+  .mobile-nav-btn.active {
+    color: #8b5cf6;
+    font-weight: bold;
+  }
+
+  .mobile-nav-btn span:first-child {
+    font-size: 20px;
+  }
+
+  /* Modal responsive */
+  .modal-box {
+    width: 95% !important;
+    padding: 20px !important;
+  }
+
+  /* Calendar responsive */
+  .calendar-grid-cell {
+    min-width: 32px;
+  }
+
+  /* Messages container */
+  .messages-container {
+    padding: 12px;
+  }
+
+  /* Input area */
+  .input-area {
+    padding: 12px;
+  }
+
+  /* Text inputs and textareas */
+  textarea,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"] {
+    font-size: 16px !important; /* Prevents zoom on iOS */
+  }
+}
+
+/* ================================
+   TABLET BREAKPOINT (768px - 1024px)
+================================ */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .sidebar {
+    width: 240px;
+    min-width: 240px;
+  }
+
+  .message-bubble {
+    max-width: 75%;
+  }
+}
+
+/* ================================
+   LANDSCAPE MODE (mobile height adjustment)
+================================ */
+@media (max-height: 600px) and (max-width: 768px) {
+  .app-layout {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    padding-top: 50px;
+    padding-bottom: 50px;
+  }
+
+  .main-header {
+    padding-left: 60px !important;
+  }
+
+  .hamburger-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+
+  .mobile-bottom-nav {
+    height: 50px;
+  }
+
+  .mobile-nav-btn {
+    min-height: 40px;
+    font-size: 9px;
+  }
+
+  .mobile-nav-btn span:first-child {
+    font-size: 18px;
+  }
+}

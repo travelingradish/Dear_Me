@@ -12,10 +12,40 @@
 
 A gentle, AI-powered journaling companion offering guided reflection, casual conversations, and free-form writing. Created to support mindfulness and mental well-being, it invites you to slow down, unwind, and nurture meaningful self-reflection in a space that is entirely your own.
 
-![Dear Me](https://img.shields.io/badge/version-1.0.1--beta-blue)
+![Dear Me](https://img.shields.io/badge/version-1.0.0--beta-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-green)
 ![React](https://img.shields.io/badge/React-19.1.1-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Latest-blue)
+
+## 📥 Download Now
+
+### 🍎 **macOS Users - Easy One-Click Installation**
+
+[**⬇️ Download Dear_Me_1.0.0.dmg**](https://github.com/yourusername/Dear_Me/releases/download/v1.0.0/Dear_Me_1.0.0.dmg)
+
+**Installation takes ~15 minutes (first time), then just double-click to launch!**
+
+1. Download the DMG file above
+2. Open it and drag "Dear Me.app" to Applications
+3. Run `install_dependencies.sh` (first time only)
+4. Open Dear Me from Applications
+5. Start journaling! 📝
+
+⏱️ **Subsequent launches**: 30 seconds (everything cached)
+
+---
+
+## 🌍 Platform Support
+
+| Platform | Status | Version |
+|----------|--------|---------|
+| **macOS** | ✅ Available | v1.0.0 |
+| **Windows** | 📅 Coming Soon | Q3 2026 |
+| **Linux** | 📅 Planned | Future |
+
+*Currently, Dear Me is only available for macOS 10.13 or later. Windows and Linux support are planned for future releases.*
+
+---
 
 ## ✨ Features
 
@@ -26,7 +56,9 @@ A gentle, AI-powered journaling companion offering guided reflection, casual con
 
 ### 🤖 **Smart AI Companion**
 - **Personalized Identity**: Name your AI friend for a more intimate experience
-- **Adaptive Memory**: Learns and remembers your details across all conversations
+- **Advanced Memory System**: Enhanced contextual memory with temporal awareness and pattern recognition
+- **Intelligent Retrieval**: Sophisticated memory filtering to distinguish current vs. historical information
+- **Memory Insights**: Automatic pattern detection, evolution tracking, and relationship analysis
 - **Crisis Detection**: Supportive responses and mental health awareness
 
 ### ✍️ **Writing Enhancement**
@@ -34,9 +66,10 @@ A gentle, AI-powered journaling companion offering guided reflection, casual con
 - Smart reset to always return to your original text
 - Side-by-side comparison of original vs. improved versions
 
-### 🌍 **Multi-Language Support** 
-- **English & 中文 (Chinese)**: Powered by Llama 3.1 model
-- One-click language switching with persistent preferences
+### 🌍 **Multi-Language Support**
+- **Universal Language Support**: Powered by unified Llama 3.1:8b model for all languages
+- **Seamless Language Switching**: Natural conversation in English, Chinese, and other languages
+- **Simplified Architecture**: Single model reduces complexity while maintaining quality
 
 ### 📅 **Unified Journal Management**
 - Visual calendar interface for all your entries
@@ -54,9 +87,11 @@ A gentle, AI-powered journaling companion offering guided reflection, casual con
 
 - **Backend**: FastAPI (Python) with SQLAlchemy ORM and SQLite database
 - **Frontend**: React TypeScript with responsive design and unified interface
-- **AI Integration**: Local Ollama models for natural language processing
+- **AI Integration**: Local Ollama with universal Llama 3.1:8b model for all languages
+- **Memory System**: Advanced contextual memory with temporal awareness and pattern recognition
 - **Authentication**: JWT-based security with bcrypt password hashing
 - **Data Flow**: RESTful APIs connecting React frontend to FastAPI backend
+- **Testing**: Comprehensive pytest suite with unit, integration, and live testing capabilities
 
 ## 🚀 Quick Start
 
@@ -84,7 +119,7 @@ After installing Ollama, you need to download the AI model:
    ```bash
    ollama pull llama3.1:8b
    ```
-   ⏳ **This takes ~20 minutes** and downloads ~4.7GB. The model supports both English and Chinese.
+   ⏳ **This takes ~20 minutes** and downloads ~4.7GB. This universal model supports all languages including English and Chinese.
 
 4. **Verify installation**:
    ```bash
@@ -92,31 +127,46 @@ After installing Ollama, you need to download the AI model:
    ```
    You should see `llama3.1:8b` in the list.
 
-### ⚡ One-Click Setup
+⚠️ **Important**: Keep the first terminal with `ollama serve` running while using Dear Me.
 
-**Choose your operating system:**
+### ⚡ One-Click Setup - Non-Technical Users
 
-#### Windows
-1. Double-click `setup.bat`
-2. Wait for setup to complete
-3. Your app opens at http://localhost:3000
+#### 🍎 macOS (Recommended - Professional Installer)
 
-#### macOS/Linux
-1. Open Terminal in the project folder
-2. Run: `./setup.sh`
-3. Your app opens at http://localhost:3000
+**For non-technical users, we provide a professional macOS installer:**
 
-#### Python (All Platforms)
-1. Run: `python setup.py`
-2. Your app opens at http://localhost:3000
+1. **Download** `Dear_Me_1.0.0.dmg` from this repository
+2. **Open the .dmg file** - Finder window appears
+3. **Drag "Dear Me.app"** to the Applications folder
+4. **Double-click `install_dependencies.sh`** - Terminal opens
+   - Installs Ollama, Node.js, and Python 3.13 automatically
+   - Takes ~10 minutes on first run
+5. **Launch** - Open Applications → Double-click "Dear Me"
+6. **Done!** Your browser opens to http://localhost:3000
 
-**That's it!** The script handles everything: downloading AI models, installing dependencies, and starting all services.
+✨ **Next time**, just double-click "Dear Me.app" in Applications - everything starts in ~30 seconds!
+
+**Additional Options:**
+- **Desktop Launcher**: Copy `Dear Me.command` to your Desktop for quick access
+- **Phone Access**: Look in Terminal for the WiFi IP (e.g., `http://192.168.x.x:3000`)
+
+---
+
+#### 🖥️ Terminal Setup (For Developers)
+
+If you prefer to use Terminal or are on Linux:
+
+1. **Open Terminal** in the project folder
+2. **Run**: `./setup.sh`
+3. **Your app** opens at http://localhost:3000
+
+The script handles everything automatically.
 
 ### 🔄 Daily Use
-After the first setup, just run the same command:
-- **Windows**: Double-click `setup.bat`
-- **macOS/Linux**: `./setup.sh`  
-- **Python**: `python setup.py`
+
+**macOS**: Double-click "Dear Me.app" in Applications (30 seconds)
+
+**Terminal**: Run `./setup.sh` (2-3 minutes)
 
 ### 🎨 Get Started
 1. **Create your account** - just username and password, no email required
@@ -137,6 +187,30 @@ After the first setup, just run the same command:
 3. **Review & Grow**: Access all your entries through the unified calendar interface
 
 The AI adapts to your communication style and remembers important details about your life, creating meaningful conversations that evolve over time.
+
+## 🧠 Advanced Memory System
+
+**Dear Me** features a sophisticated memory system that creates truly personalized conversations:
+
+### 🎯 **Contextual Memory Intelligence**
+- **Temporal Awareness**: Distinguishes between current conversations and historical memories
+- **Memory Type Classification**: Separates factual information (relationships, personal details) from temporal preferences (interests, goals)
+- **Age-Based Relevance**: Automatically applies temporal penalties to outdated information
+- **Real-Time Correction**: Instantly updates incorrect memories when corrected by users
+
+### 🔍 **Smart Memory Retrieval**
+- **Pattern Recognition**: Advanced regex and keyword-based memory extraction across 6 categories
+- **Relevance Scoring**: Sophisticated algorithms to find the most contextually relevant memories
+- **Memory Limits**: Intelligent filtering to prevent information overload (max 5 relevant memories per conversation)
+- **Category Organization**: Organized memory storage across personal_info, relationships, interests, challenges, goals, and preferences
+
+### 📊 **Memory Insights & Analysis**
+- **Evolution Tracking**: Monitors how your thoughts, goals, and preferences change over time
+- **Contradiction Detection**: Identifies conflicting information and suggests clarification
+- **Pattern Analysis**: Recognizes recurring themes and important life patterns
+- **Gap Identification**: Suggests conversation topics based on missing memory categories
+
+This creates conversations that feel natural and personal, as if talking to a friend who truly knows and remembers you.
 
 ## 🎨 UI Features
 
@@ -169,13 +243,36 @@ The AI adapts to your communication style and remembers important details about 
 - **Caching Strategy**: Local storage for auth tokens
 
 ### Quality Assurance
-- **Comprehensive Testing**: Robust testing across backend and frontend
+- **Comprehensive Testing**: Robust testing across backend and frontend with pytest suite
+- **Memory System Validation**: Dedicated testing for memory retrieval, temporal filtering, and context accuracy
 - **Error Handling**: Graceful error management and user feedback
 - **Input Validation**: Secure data validation and sanitization
 - **Code Quality**: Clean, maintainable codebase with consistent standards
 - **Performance Monitoring**: Optimized response times and efficient operation
 
+## 🔧 Recent Improvements (September 2025)
+
+### 🎯 **Major Memory System Overhaul**
+- **Fixed Critical Memory Bug**: Resolved issue where memory objects weren't properly converted to strings for LLM processing
+- **Enhanced Temporal Filtering**: Improved distinction between current conversations and historical memories
+- **Real-Time Memory Correction**: Added ability to instantly update incorrect memories when users provide corrections
+- **Memory Type Classification**: Implemented factual vs. temporal memory categories with appropriate aging policies
+
+### 🧪 **Testing & Quality Improvements**
+- **Comprehensive Test Suite**: Added extensive pytest coverage for memory system, API endpoints, and core functionality
+- **Memory Validation Tests**: Created dedicated tests to verify memory retrieval accuracy and temporal filtering
+- **Bug Detection**: Identified and resolved 25+ actual implementation issues through rigorous testing
+- **Integration Testing**: Full-stack testing with actual Ollama LLM integration
+
+### 🚀 **Performance & Reliability**
+- **Improved Error Handling**: Enhanced debugging and error reporting throughout the application
+- **Schema Validation**: Fixed API schema mismatches and improved data type consistency
+- **Memory Efficiency**: Optimized memory retrieval to prevent information overload (5-memory limit)
+- **Conversation Context**: Better handling of conversation state and session management
+
 ## 🤝 Contributing
+
+Thank you for your interest in contributing to Dear Me!
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -199,4 +296,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Dear Me** — *Your gentle companion, built with ❤️  for unpacking, reflection, and growth in your own sacred space*
-

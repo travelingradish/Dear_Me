@@ -1,7 +1,7 @@
 import logging
 import re
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple, Any
 from sqlalchemy.orm import Session
 from app.models.models import User, UserMemory, MemorySnapshot, DiarySession, ConversationMessage
@@ -16,9 +16,13 @@ class ExtractedMemory:
 
 class MemoryService:
     """Service for managing user memories - extraction, storage, and retrieval"""
-    
+
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+
+        # Memory type classifications for better temporal awareness
+        self.factual_categories = {'personal_info', 'relationships'}  # Persistent facts
+        self.temporal_categories = {'interests', 'challenges', 'goals', 'preferences'}  # Time-sensitive
         
         # Memory categories and their patterns
         self.memory_categories = {
@@ -180,7 +184,7 @@ class MemoryService:
                 # Update existing memory
                 existing_memory.memory_value = memory_data['memory_value']
                 existing_memory.confidence_score = min(1.0, existing_memory.confidence_score + 0.1)  # Increase confidence
-                existing_memory.last_updated = datetime.utcnow()
+                existing_memory.last_updated = datetime.now(timezone.utc)
                 existing_memory.mention_count += 1
                 stored_memories.append(existing_memory)
             else:
@@ -329,7 +333,7 @@ class MemoryService:
             'total_memories': len(memories),
             'by_category': {},
             'high_confidence': len([m for m in memories if m.confidence_score >= 0.8]),
-            'recent_memories': len([m for m in memories if m.last_updated >= datetime.utcnow() - timedelta(days=7)])
+            'recent_memories': len([m for m in memories if m.last_updated >= datetime.now(timezone.utc) - timedelta(days=7)])
         }
         
         for memory in memories:
@@ -424,7 +428,7 @@ class MemoryService:
                 # Update existing memory
                 existing_memory.memory_value = memory_data['memory_value']
                 existing_memory.confidence_score = min(1.0, existing_memory.confidence_score + 0.1)
-                existing_memory.last_updated = datetime.utcnow()
+                existing_memory.last_updated = datetime.now(timezone.utc)
                 existing_memory.mention_count += 1
                 stored_memories.append(existing_memory)
             else:
@@ -446,7 +450,7 @@ class MemoryService:
     def get_relevant_memories(self, user_id: int, context: str, db_session: Session, limit: int = 10, current_time: datetime = None, conversation_type: str = "current") -> List[UserMemory]:
         """Get contextually relevant memories with improved relevance scoring"""
         if not current_time:
-            current_time = datetime.now()  # Use local time instead of UTC
+            current_time = datetime.now(timezone.utc)  # Use timezone-aware UTC
             
         query = db_session.query(UserMemory).filter(
             UserMemory.user_id == user_id,
@@ -468,28 +472,40 @@ class MemoryService:
         
         # If no context provided, return recent high-confidence memories (but filtered)
         if not context or not context.strip():
-            return self._filter_memories_by_context_type(all_memories[:limit * 2], conversation_type, current_time)[:limit]
+            # For vague queries, be more strict about temporal relevance
+            filtered_memories = self._filter_memories_by_context_type(all_memories[:limit * 3], conversation_type, current_time)
+            # Additional temporal filter for vague queries - exclude memories older than 24 hours
+            recent_memories = []
+            for memory in filtered_memories:
+                temporal_relevance = self._calculate_temporal_relevance_multiplier(memory, current_time)
+                if temporal_relevance > 0.3:  # Only include memories less than ~24 hours old for vague queries
+                    recent_memories.append(memory)
+            return recent_memories[:limit]
         
-        # Enhanced relevance scoring with time awareness
+        # Enhanced relevance scoring with improved temporal awareness
+        # Higher scores = more relevant memories (fresher memories get higher multipliers)
         scored_memories = []
         context_lower = context.lower()
         context_words = set(context_lower.split())
-        
+
+        # Check for memory correction patterns first
+        self.invalidate_outdated_memories(db_session, user_id, context)
+
         # Time-related keywords to identify temporal memories
         time_keywords = {'morning', 'afternoon', 'evening', 'night', 'wake', 'sleep', 'early', 'late', 'time', 'clock', 'schedule', 'routine'}
         current_time_keywords = {'now', 'currently', 'today', 'this morning', 'this afternoon', 'this evening', 'right now', 'at the moment'}
-        
+
         # Define conversation intent keywords to understand context better
         mood_keywords = {'feel', 'feeling', 'mood', 'emotional', 'happy', 'sad', 'angry', 'excited', 'tired', 'stressed', 'calm', 'anxious'}
-        activity_keywords = {'did', 'went', 'work', 'school', 'meeting', 'exercise', 'run', 'walk', 'eat', 'cook', 'watch', 'read', 'play'}
+        activity_keywords = {'did', 'went', 'work', 'school', 'meeting', 'exercise', 'run', 'walk', 'eat', 'cook', 'watch', 'read', 'play', 'stretching', 'stretch', 'yoga', 'fitness', 'workout'}
         relationship_keywords = {'friend', 'family', 'partner', 'colleague', 'mom', 'dad', 'wife', 'husband', 'boyfriend', 'girlfriend', 'cat', 'dog', 'pet'}
         challenge_keywords = {'difficult', 'hard', 'problem', 'challenge', 'struggle', 'win', 'success', 'achievement', 'accomplish'}
-        
+
         # Determine context type and time relevance
         context_type = 'general'
         is_current_time_query = any(word in context_words for word in current_time_keywords)
         has_time_context = any(word in context_words for word in time_keywords)
-        
+
         if any(word in context_words for word in mood_keywords):
             context_type = 'mood'
         elif any(word in context_words for word in activity_keywords):
@@ -503,71 +519,137 @@ class MemoryService:
             relevance_score = 0
             memory_words = set(memory.memory_value.lower().split())
             memory_content_lower = memory.memory_value.lower()
-            
+
+            # Calculate temporal relevance multiplier (fresher = higher score)
+            temporal_relevance = self._calculate_temporal_relevance_multiplier(memory, current_time)
+
             # Check if memory is time-specific (contains time references)
             memory_has_time_refs = any(word in memory_words for word in time_keywords)
-            
-            # TEMPORAL FILTERING: Skip time-specific memories for current conversations unless directly relevant
-            if conversation_type == "current" and memory_has_time_refs and not has_time_context:
-                # If this is a current conversation and memory mentions time but context doesn't, penalize heavily
-                if is_current_time_query:
-                    # Exception: if user is asking about current time, time memories might be relevant
-                    pass  
+
+            # TEMPORAL FILTERING: Skip old temporal memories unless highly relevant
+            memory_type = self._classify_memory_type(memory)
+            if memory_type == 'temporal' and temporal_relevance < 0.5:
+                # For very old memories (relevance < 0.2), apply much stricter filtering
+                if temporal_relevance < 0.2:
+                    # Very old memories (>2 days) should almost never be included
+                    # Only allow if conversation is SPECIFICALLY about that old event
+                    word_overlap = len(context_words & memory_words)
+                    # Require very high word overlap AND high confidence for very old memories
+                    if word_overlap < 3 or memory.confidence_score < 0.9:
+                        continue
                 else:
-                    # Skip memories about specific times (like wake-up times) when irrelevant
-                    relevance_score -= 2.0  # Heavy penalty
-            
-            # 1. Direct word overlap (reduced weight)
+                    # For moderately old memories (0.2-0.5 relevance), require some word overlap
+                    word_overlap = len(context_words & memory_words)
+                    if word_overlap < 2:  # Need at least 2 matching words for old memories
+                        continue
+
+            # ACTIVITY FILTER: Skip old activity memories in activity contexts
+            if context_type == 'activity':
+                is_activity_memory = any(word in memory.memory_value.lower() for word in
+                                       ['watching', 'doing', 'activities', 'playing', 'working on'])
+                if is_activity_memory and temporal_relevance < 0.1:
+                    # Skip old activity memories (under 10% relevance) unless highly relevant
+                    word_overlap = len(context_words & memory_words)
+                    if word_overlap < 3:  # Need strong word overlap for very old activities
+                        continue
+
+            # 1. Direct word overlap (weighted by temporal relevance)
             word_overlap = len(context_words & memory_words)
             if word_overlap > 0:
-                relevance_score += word_overlap * 0.3
-            
-            # 2. Category relevance based on context type
+                # More word overlap + fresher memory = higher relevance score
+                relevance_score += word_overlap * 0.4 * temporal_relevance
+
+            # 2. Enhanced category relevance based on context type
             category_bonus = 0
-            if context_type == 'mood' and memory.category == 'personal_info':
-                category_bonus = 0.2
+            if context_type == 'mood' and memory.category in ['challenges', 'personal_info']:
+                category_bonus = 0.3
             elif context_type == 'activity' and memory.category == 'interests':
-                category_bonus = 0.4
-            elif context_type == 'relationship' and memory.category == 'relationships':
                 category_bonus = 0.5
+            elif context_type == 'relationship' and memory.category == 'relationships':
+                category_bonus = 0.7  # Boost relationship relevance
             elif context_type == 'challenge' and memory.category in ['goals', 'challenges']:
-                category_bonus = 0.4
-            
-            relevance_score += category_bonus
-            
+                category_bonus = 0.5
+
+            # Category bonus is also weighted by temporal relevance
+            relevance_score += category_bonus * temporal_relevance
+
             # 3. Semantic relevance - check for related concepts
             if context_type == 'mood':
-                # For mood contexts, prefer emotional or personal memories
                 emotion_indicators = ['feel', 'emotion', 'mood', 'happy', 'sad', 'stress', 'calm', 'love', 'hate', 'enjoy', 'like', 'dislike']
                 if any(indicator in memory_content_lower for indicator in emotion_indicators):
-                    relevance_score += 0.3
-            
-            # 4. Penalize potentially irrelevant memories
-            # If context is about today's activities but memory is about personal info, reduce relevance
-            if context_type == 'activity' and memory.category == 'personal_info':
-                relevance_score *= 0.5
-            
-            # 5. Boost recent memories if they're somewhat relevant
-            if relevance_score > 0 and memory.last_updated:
-                days_old = (current_time - memory.last_updated).days
-                if days_old < 7:  # Recent memories get slight boost
-                    relevance_score += 0.1
-            
-            # 6. Consider confidence score
-            relevance_score += memory.confidence_score * 0.2
-            
-            # Only include memories with meaningful relevance
-            if relevance_score > 0.2:  # Minimum threshold
+                    relevance_score += 0.4 * temporal_relevance
+            elif context_type == 'relationship':
+                # Boost memories that mention relationship words
+                if any(word in memory_content_lower for word in relationship_keywords):
+                    relevance_score += 0.5 * temporal_relevance
+
+            # 4. Enhanced cross-category irrelevance filtering
+            if context_type == 'activity':
+                # For activity context, heavily penalize unrelated memories
+                if memory.category == 'personal_info' and word_overlap == 0:
+                    relevance_score *= 0.1  # Much stricter penalty
+                elif memory.category == 'interests' and word_overlap == 0:
+                    # Check if it's actually related to the activity
+                    activity_related = any(word in memory_content_lower for word in activity_keywords)
+                    if not activity_related:
+                        relevance_score *= 0.2
+            elif context_type == 'relationship' and memory.category in ['interests', 'preferences']:
+                relevance_score *= 0.4
+
+            # Add strict filtering for completely unrelated content
+            if word_overlap == 0 and category_bonus == 0:
+                # No word overlap and no category relevance - likely irrelevant
+                relevance_score *= 0.1
+
+            # 5. Consider confidence score (weighted by temporal relevance)
+            relevance_score += memory.confidence_score * 0.3 * temporal_relevance
+
+            # 6. Boost very recent and high-confidence memories slightly
+            if memory.last_updated:
+                # Handle timezone-aware vs naive datetime comparison
+                mem_time = memory.last_updated
+                if mem_time.tzinfo is None:
+                    mem_time = mem_time.replace(tzinfo=timezone.utc)
+                curr_time = current_time if current_time.tzinfo else current_time.replace(tzinfo=timezone.utc)
+
+                if (curr_time - mem_time).total_seconds() < 7200:  # 2 hours
+                    relevance_score += 0.2
+
+            # 7. FREQUENCY-BASED IMPORTANCE SCORING (NEW)
+            # Memories mentioned 3+ times are clearly important to the user
+            importance_boost = 0
+            if memory.mention_count >= 5:
+                importance_boost = 5.0  # Very important - mentioned 5+ times
+                self.logger.debug(f"Very important memory (5+ mentions): {memory.memory_value[:50]}")
+            elif memory.mention_count >= 3:
+                importance_boost = 3.0  # Important - mentioned 3+ times
+                self.logger.debug(f"Important memory (3+ mentions): {memory.memory_value[:50]}")
+
+            relevance_score += importance_boost
+
+            # INCREASED MINIMUM THRESHOLD for better filtering
+            if relevance_score > 0.5:  # Higher threshold (was 0.2)
                 scored_memories.append((memory, relevance_score))
         
         # Sort by relevance score and return top memories
         scored_memories.sort(key=lambda x: x[1], reverse=True)
-        relevant_memories = [memory for memory, score in scored_memories[:limit]]
-        
-        # If no relevant memories found, return a small set of high-confidence recent memories
+        relevant_memories = [memory for memory, score in scored_memories[:min(limit, 5)]]  # Cap at 5 memories max
+
+        # If no relevant memories found, be very conservative with fallback
         if not relevant_memories:
-            return all_memories[:min(3, limit)]
-        
+            # Only return fallback memories if the context is very general
+            if len(context_words) <= 2 or context_type == 'general':
+                fallback_memories = []
+                for memory in all_memories[:5]:  # Check fewer memories
+                    if self._classify_memory_type(memory) == 'factual' and self._calculate_temporal_relevance_multiplier(memory, current_time) > 0.9:
+                        fallback_memories.append(memory)
+                        if len(fallback_memories) >= 1:  # Only 1 fallback memory
+                            break
+                return fallback_memories
+            else:
+                # For specific context, return empty if no relevant memories
+                return []
+
         return relevant_memories
     
     def _filter_memories_by_context_type(self, memories: List[UserMemory], conversation_type: str, current_time: datetime) -> List[UserMemory]:
@@ -627,7 +709,7 @@ class MemoryService:
             
             # For mood-only contexts, limit to recent emotional memories
             if is_mood_only and memory.category not in ['personal_info'] and memory.last_updated:
-                days_old = (datetime.utcnow() - memory.last_updated).days
+                days_old = (datetime.now(timezone.utc) - memory.last_updated).days
                 if days_old > 30:  # Skip older memories for simple mood updates
                     should_include = False
             
@@ -651,8 +733,8 @@ class MemoryService:
             if should_include:
                 filtered_memories.append(memory)
         
-        # Limit the number of memories to prevent overwhelming the prompt
-        max_memories = 3 if len(context.split()) < 10 else 5
+        # Stricter memory limits to prevent overwhelming
+        max_memories = 2 if len(context.split()) < 10 else 3  # Reduced from 3/5 to 2/3
         return filtered_memories[:max_memories]
     
     def create_memory_snapshot(self, user_id: int, db_session: Session, diary_session_id: Optional[int] = None) -> MemorySnapshot:
@@ -662,10 +744,10 @@ class MemoryService:
             UserMemory.user_id == user_id,
             UserMemory.is_active == True
         ).all()
-        
+
         # Create snapshot data
         extracted_memories = []  # Empty for this test interface
-        session_summary = f"Memory snapshot created at {datetime.utcnow()}"
+        session_summary = f"Memory snapshot created at {datetime.now(timezone.utc)}"
         
         # Create the snapshot manually instead of calling parent method
         snapshot = MemorySnapshot(
@@ -685,3 +767,265 @@ class MemoryService:
         db_session.add(snapshot)
         db_session.commit()
         return snapshot
+
+    # NEW IMPROVED MEMORY METHODS
+
+    def correct_memory(self, db: Session, user_id: int, old_value: str, new_value: str, category: str = None) -> bool:
+        """Correct or update existing memory with new information"""
+        try:
+            # Find memories that contain the old value
+            query = db.query(UserMemory).filter(
+                UserMemory.user_id == user_id,
+                UserMemory.is_active == True
+            )
+
+            if category:
+                query = query.filter(UserMemory.category == category)
+
+            # Find memories containing the old information
+            memories_to_update = []
+            for memory in query.all():
+                if old_value.lower() in memory.memory_value.lower():
+                    memories_to_update.append(memory)
+
+            # Update or replace the memories
+            for memory in memories_to_update:
+                if category == 'relationships' or 'relationships' in memory.category:
+                    # For relationships, update the memory value directly
+                    memory.memory_value = memory.memory_value.replace(old_value, new_value)
+                    memory.last_updated = datetime.now(timezone.utc)
+                    memory.confidence_score = min(1.0, memory.confidence_score + 0.1)  # Boost confidence for corrected info
+                    self.logger.info(f"Corrected relationship memory: {old_value} -> {new_value}")
+                else:
+                    # For other categories, mark as outdated and create new memory
+                    memory.is_active = False
+
+                    # Create new corrected memory
+                    new_memory = UserMemory(
+                        user_id=user_id,
+                        category=memory.category,
+                        memory_key=f"{memory.category}_{new_value.lower().replace(' ', '_')}",
+                        memory_value=new_value,
+                        confidence_score=0.9,  # High confidence for user-corrected information
+                        source_type="user_correction"
+                    )
+                    db.add(new_memory)
+
+            db.commit()
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Error correcting memory: {e}")
+            db.rollback()
+            return False
+
+    def invalidate_outdated_memories(self, db: Session, user_id: int, context: str) -> None:
+        """Identify and invalidate memories that contradict current conversation"""
+        try:
+            # Look for explicit corrections in the conversation
+            correction_patterns = [
+                r"no.*(?:not|isn't|aren't|wasn't|weren't).*(\w+)",
+                r"actually.*(?:is|are|was|were).*(\w+)",
+                r"(?:my|the).*(?:is|are).*(\w+).*not.*(\w+)",
+                r"(\w+)\s+is\s+my\s+(\w+)",  # "Pramod is my husband"
+            ]
+
+            context_lower = context.lower()
+
+            # Check for relationship corrections specifically
+            if any(word in context_lower for word in ['husband', 'wife', 'partner', 'friend', 'colleague', 'son', 'daughter']):
+                # Extract relationship corrections
+                import re
+                for pattern in correction_patterns:
+                    matches = re.findall(pattern, context_lower)
+                    for match in matches:
+                        if isinstance(match, tuple):
+                            # Handle tuple matches (person, relationship)
+                            if len(match) == 2:
+                                person, relationship = match
+                                self._update_relationship_memory(db, user_id, person, relationship)
+
+        except Exception as e:
+            self.logger.error(f"Error invalidating outdated memories: {e}")
+
+    def _update_relationship_memory(self, db: Session, user_id: int, person: str, relationship: str) -> None:
+        """Update or create relationship memory"""
+        try:
+            # Find existing memory for this person
+            existing_memory = db.query(UserMemory).filter(
+                UserMemory.user_id == user_id,
+                UserMemory.category == 'relationships',
+                UserMemory.memory_value.contains(person.title()),
+                UserMemory.is_active == True
+            ).first()
+
+            new_memory_value = f"{person.title()} is my {relationship}"
+
+            if existing_memory:
+                # Update existing memory
+                existing_memory.memory_value = new_memory_value
+                existing_memory.last_updated = datetime.now(timezone.utc)
+                existing_memory.confidence_score = 0.95  # Very high confidence for explicit corrections
+            else:
+                # Create new relationship memory
+                new_memory = UserMemory(
+                    user_id=user_id,
+                    category='relationships',
+                    memory_key=f"relationships_{person.lower()}_{relationship.lower()}",
+                    memory_value=new_memory_value,
+                    confidence_score=0.95,
+                    source_type="conversation_correction"
+                )
+                db.add(new_memory)
+
+            db.commit()
+            self.logger.info(f"Updated relationship memory: {new_memory_value}")
+
+        except Exception as e:
+            self.logger.error(f"Error updating relationship memory: {e}")
+
+    def _classify_memory_type(self, memory: UserMemory) -> str:
+        """Classify memory as factual or temporal"""
+        # First check content for strong temporal indicators (overrides category)
+        temporal_indicators = [
+            'today', 'yesterday', 'this morning', 'this afternoon', 'last week', 'recently',
+            'went to', 'had lunch', 'had dinner', 'had breakfast', 'did', 'was doing', 'feeling', 'felt',
+            'watching', 'doing', 'activities', 'playing', 'working on', 'currently',
+            'visited', 'drove to', 'walked to', 'shopping', 'bought', 'ordered',
+            '今天', '昨天', '早上', '下午', '上周', '最近', '去了', '吃了', '做了', '感觉', '正在'
+        ]
+
+        content_lower = memory.memory_value.lower()
+
+        # Strong temporal indicators override category classification
+        if any(indicator in content_lower for indicator in temporal_indicators):
+            return 'temporal'
+
+        # Category-based classification for non-temporal content
+        if memory.category in self.factual_categories:
+            return 'factual'
+        elif memory.category in self.temporal_categories:
+            return 'temporal'
+        else:
+            return 'factual'
+
+    def _calculate_temporal_relevance_multiplier(self, memory: UserMemory, current_time: datetime) -> float:
+        """
+        Calculate how relevant a temporal memory is based on its age.
+
+        Returns a multiplier between 0.01 and 1.0:
+        - 1.0 = 100% relevant (very fresh memory)
+        - 0.5 = 50% relevant (moderately old)
+        - 0.01 = 1% relevant (very old, almost irrelevant)
+
+        Fresher memories get HIGHER multipliers (more relevant)
+        Older memories get LOWER multipliers (less relevant)
+        """
+        if not memory.last_updated:
+            return 0.5  # Moderate relevance for memories without timestamps
+
+        memory_type = self._classify_memory_type(memory)
+
+        if memory_type == 'factual':
+            return 1.0  # Factual memories remain fully relevant over time
+
+        # Handle timezone-aware vs naive datetime comparison (for transition period)
+        memory_time = memory.last_updated
+        if memory_time.tzinfo is None:
+            # Convert naive datetime to UTC-aware for comparison
+            memory_time = memory_time.replace(tzinfo=timezone.utc)
+
+        # Ensure current_time is timezone-aware
+        if current_time.tzinfo is None:
+            current_time = current_time.replace(tzinfo=timezone.utc)
+
+        # For temporal memories, calculate age-based relevance multiplier
+        age_hours = (current_time - memory_time).total_seconds() / 3600
+
+        # Activity memories are more time-sensitive than general temporal memories
+        is_activity_memory = any(word in memory.memory_value.lower() for word in
+                               ['watching', 'doing', 'activities', 'playing', 'working on'])
+
+        # REVISED TEMPORAL DECAY CURVE - More user-friendly and less aggressive
+        # User feedback: 1 day = critical, 2 days = high impact, 3+ mentions = important
+
+        if age_hours < 24:  # 0-1 day (CRITICAL window)
+            return 1.0  # 100% relevant - happened today/last 24 hours
+        elif age_hours < 72:  # 1-3 days (HIGH IMPACT window)
+            # Much gentler decay for 1-3 day old memories
+            return 0.7 if is_activity_memory else 0.8  # 70-80% relevant
+        elif age_hours < 168:  # 3-7 days (one week)
+            # Still quite relevant for general memories
+            return 0.4 if is_activity_memory else 0.6  # 40-60% relevant
+        elif age_hours < 720:  # 7-30 days (one month)
+            # Background context - still accessible
+            return 0.2 if is_activity_memory else 0.3  # 20-30% relevant
+        else:  # 30+ days
+            # Archive tier - low but not zero relevance
+            return 0.05 if is_activity_memory else 0.1  # 5-10% relevant
+
+    def track_conversation_context(self, db: Session, user_id: int, session_id: int, context_updates: Dict[str, Any]) -> None:
+        """Track conversation-specific context and corrections"""
+        try:
+            # Store conversation context in session structured_data
+            session = db.query(DiarySession).filter(DiarySession.id == session_id).first()
+            if session:
+                if not session.structured_data:
+                    session.structured_data = {}
+
+                # Track memory corrections in this conversation
+                if 'memory_corrections' not in session.structured_data:
+                    session.structured_data['memory_corrections'] = {}
+
+                # Update with new context
+                session.structured_data['memory_corrections'].update(context_updates)
+                session.last_updated = datetime.now(timezone.utc)
+
+                db.commit()
+                self.logger.info(f"Updated conversation context for session {session_id}")
+
+        except Exception as e:
+            self.logger.error(f"Error tracking conversation context: {e}")
+
+    def get_conversation_context(self, db: Session, session_id: int) -> Dict[str, Any]:
+        """Get conversation-specific context and corrections"""
+        try:
+            session = db.query(DiarySession).filter(DiarySession.id == session_id).first()
+            if session and session.structured_data and 'memory_corrections' in session.structured_data:
+                return session.structured_data['memory_corrections']
+            return {}
+        except Exception as e:
+            self.logger.error(f"Error getting conversation context: {e}")
+            return {}
+
+    def get_relevant_memories_with_session_context(self, user_id: int, context: str, db_session: Session,
+                                                  session_id: int = None, limit: int = 5) -> List[UserMemory]:
+        """Enhanced memory retrieval with session-specific context awareness"""
+
+        # Get base relevant memories
+        relevant_memories = self.get_relevant_memories(user_id, context, db_session, limit)
+
+        # Apply session-specific corrections if available
+        if session_id:
+            session_context = self.get_conversation_context(db_session, session_id)
+            if session_context:
+                # Filter out memories that have been corrected in this session
+                filtered_memories = []
+                for memory in relevant_memories:
+                    should_include = True
+
+                    # Check if this memory has been corrected in current session
+                    for corrected_key, corrected_value in session_context.items():
+                        if corrected_key.lower() in memory.memory_value.lower():
+                            # This memory contains information that was corrected
+                            if memory.category == 'relationships':
+                                # For relationships, prefer session context over old memory
+                                should_include = False
+                                break
+
+                    if should_include:
+                        filtered_memories.append(memory)
+
+                return filtered_memories
+
+        return relevant_memories

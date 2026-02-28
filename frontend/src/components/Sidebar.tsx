@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx';
+import '../styles/responsive.css';
 
 interface SidebarProps {
   currentMode: 'guided' | 'casual' | 'free_entry';
@@ -19,6 +20,7 @@ export default function Sidebar({
   const { user, logout, updateCharacterName, language } = useAuth();
   const [showCharacterNamingModal, setShowCharacterNamingModal] = useState(false);
   const [characterName, setCharacterName] = useState('');
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const handleUpdateCharacterName = async () => {
     if (!characterName.trim()) return;
@@ -92,14 +94,26 @@ export default function Sidebar({
   };
 
   return (
-    <div style={{ 
-      width: '300px', 
-      backgroundColor: 'white', 
-      borderRight: '1px solid #e0e0e0',
-      padding: '20px',
-      display: 'flex',
-      flexDirection: 'column'
-    }}>
+    <>
+      {/* Hamburger button — only visible on mobile via CSS */}
+      <button
+        className="hamburger-btn"
+        onClick={() => setIsMobileOpen(true)}
+        aria-label="Open menu"
+      >
+        ☰
+      </button>
+
+      {/* Overlay — only visible on mobile when open */}
+      {isMobileOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar panel */}
+      <div className={`sidebar ${isMobileOpen ? 'mobile-open' : ''}`}>
       {/* User Info Section */}
       <div style={{ marginBottom: '20px' }}>
         <h3 style={{ marginBottom: '10px', color: '#333' }}>Welcome, {user?.username}!</h3>
@@ -252,6 +266,35 @@ export default function Sidebar({
           </div>
         </div>
       )}
-    </div>
+      </div>
+
+      {/* Mobile bottom navigation */}
+      <nav className="mobile-bottom-nav">
+        <button
+          className={`mobile-nav-btn ${currentMode === 'guided' ? 'active' : ''}`}
+          onClick={() => { onSwitchToGuided?.(); setIsMobileOpen(false); }}
+          aria-label={language === 'en' ? 'Guided mode' : '引导模式'}
+        >
+          <span>📝</span>
+          <span>{language === 'en' ? 'Guided' : '引导'}</span>
+        </button>
+        <button
+          className={`mobile-nav-btn ${currentMode === 'casual' ? 'active' : ''}`}
+          onClick={() => { onSwitchToSimple?.(); setIsMobileOpen(false); }}
+          aria-label={language === 'en' ? 'Casual mode' : '休闲模式'}
+        >
+          <span>💬</span>
+          <span>{language === 'en' ? 'Casual' : '休闲'}</span>
+        </button>
+        <button
+          className={`mobile-nav-btn ${currentMode === 'free_entry' ? 'active' : ''}`}
+          onClick={() => { onSwitchToFreeEntry?.(); setIsMobileOpen(false); }}
+          aria-label={language === 'en' ? 'Free entry mode' : '自由书写模式'}
+        >
+          <span>✍️</span>
+          <span>{language === 'en' ? 'Free' : '自由'}</span>
+        </button>
+      </nav>
+    </>
   );
 }

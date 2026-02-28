@@ -4,7 +4,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import uvicorn
 import logging
@@ -25,7 +25,7 @@ app = FastAPI(title="Daily Check-in API", version="2.0.0")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # React dev server
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "*"],  # Local dev + mobile WiFi access
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
     allow_headers=["*"],
@@ -197,24 +197,40 @@ async def create_conversation(
 ):
     try:
         # Get relevant memories for context with time awareness
-        current_time = datetime.now()  # Use local time instead of UTC
+        current_time = datetime.now(timezone.utc)  # Use timezone-aware UTC
         user_memories = memory_service.get_relevant_memories(
-            current_user.id, conversation_data.message, db, 
+            current_user.id, conversation_data.message, db,
             current_time=current_time, conversation_type="current"
         )
-        
+
+        # Debug logging for memories
+        print(f"MEMORY DEBUG: User query: {conversation_data.message}")
+        print(f"MEMORY DEBUG: Found {len(user_memories)} memories:")
+        for i, memory in enumerate(user_memories, 1):
+            print(f"  {i}. [{memory.category}] {memory.memory_value}")
+
         # Generate LLM response with memory context
         character_name = current_user.ai_character_name or "AI Assistant"
+
+        # Debug log the LLM call
+        print(f"LLM DEBUG: Calling LLM with {len(user_memories)} memories, character: {character_name}")
+
+        # Convert memory objects to strings for LLM
+        memory_strings = [memory.memory_value for memory in user_memories] if user_memories else None
+
         response = llm_service.generate_conversation_response(
             message=conversation_data.message,
             conversation_history=conversation_data.conversation_history,
             language=conversation_data.language,
             model_name=conversation_data.model,
-            user_memories=user_memories,
+            user_memories=memory_strings,
             character_name=character_name,
             user_age=get_user_age(current_user),
             current_time=current_time
         )
+
+        # Debug log the LLM response
+        print(f"LLM DEBUG: LLM responded with: {response[:200]}...")
         
         # Extract and store new memories from USER MESSAGE ONLY (not AI response)
         extracted_memories = memory_service.extract_memories_from_text(
@@ -234,8 +250,11 @@ async def create_conversation(
         db.commit()
         
         return {"success": True, "response": response}
-        
+
     except Exception as e:
+        import traceback
+        logging.error(f"Error in /llm/conversation: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/diary/generate")
@@ -245,12 +264,12 @@ async def generate_diary(
     db: Session = Depends(get_db)
 ):
     try:
-        # Generate diary entry
+        # Generate diary entry using existing LLM service
         diary_content = llm_service.generate_diary_entry(
-            answers=diary_data.answers,
             conversation_history=diary_data.conversation_history,
             language=diary_data.language,
-            tone=diary_data.tone
+            user_age=get_user_age(current_user),
+            ai_character_name=current_user.ai_character_name or "AI Assistant"
         )
         
         # Save diary entry
@@ -266,8 +285,12 @@ async def generate_diary(
         db.commit()
         
         return {"success": True, "diary": diary_content, "entry_id": diary_entry.id}
-        
+
     except Exception as e:
+        import traceback
+        error_details = f"Diary generation error: {str(e)}\nTraceback: {traceback.format_exc()}"
+        print(f"DIARY ERROR: {error_details}")
+        logging.error(error_details)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/conversations")
@@ -373,26 +396,63 @@ async def send_guided_message(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Send a message in guided diary conversation"""
+    """Send a message in guided diary conversation with enhanced graph-based routing"""
     try:
         # Validate message is not empty
         if not message_data.message or message_data.message.strip() == "":
             raise HTTPException(status_code=422, detail="Message cannot be empty")
-        
+
         flow_controller = DiaryFlowController(db)
         session = flow_controller.get_session_by_id(session_id, current_user.id)
-        
+
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
-        
-        # Process the user message
-        model = getattr(message_data, 'model', 'llama3.1:8b')
-        result = flow_controller.process_user_message(
-            session.id, message_data.message, model
-        )
+
+        # Integrate GraphConversationService for enhanced conversation routing
+        try:
+            from app.services.graph_conversation_service import GraphConversationService
+
+            # Use hybrid approach: Graph service for routing, flow controller for session management
+            graph_service = GraphConversationService(db)
+
+            # Get graph-based insights and contextual memory analysis
+            graph_result = graph_service.process_conversation(session_id, message_data.message)
+
+            # Use graph insights to enhance the flow controller decision
+            enhanced_context = {
+                "graph_insights": graph_result.get("insights", {}),
+                "memory_context": graph_result.get("metadata", {}),
+                "emotional_state": graph_result.get("insights", {}).get("emotional_state", "neutral")
+            }
+
+            # Process through enhanced flow controller with graph context
+            model = getattr(message_data, 'model', 'llama3.1:8b')
+            try:
+                # Try enhanced method if available
+                if hasattr(flow_controller, 'process_user_message_with_context'):
+                    result = flow_controller.process_user_message_with_context(
+                        session.id, message_data.message, model, enhanced_context
+                    )
+                else:
+                    result = flow_controller.process_user_message(
+                        session.id, message_data.message, model
+                    )
+            except (AttributeError, TypeError):
+                # Fallback to original method
+                result = flow_controller.process_user_message(
+                    session.id, message_data.message, model
+                )
+
+        except ImportError:
+            # Fallback if GraphConversationService is not available
+            model = getattr(message_data, 'model', 'llama3.1:8b')
+            result = flow_controller.process_user_message(
+                session.id, message_data.message, model
+            )
+
         assistant_response = result["response"]
         is_complete = result["phase_complete"]
-        
+
         # Refresh session object to get updated state after message processing
         db.refresh(session)
         
@@ -527,6 +587,126 @@ async def get_active_guided_session(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# Graph Conversation Service with Enhanced Memory Integration
+@app.post("/graph-conversation/{session_id}/message")
+async def process_graph_conversation_message(
+    session_id: int,
+    message: GuidedChatMessage,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Process message through the graph conversation system with contextual memory integration
+    and dynamic follow-up question generation
+    """
+    try:
+        from app.services.graph_conversation_service import GraphConversationService
+        from app.services.contextual_memory_service import ContextualMemoryService
+
+        # Verify session belongs to current user
+        session = db.query(DiarySession).filter(
+            DiarySession.id == session_id,
+            DiarySession.user_id == current_user.id
+        ).first()
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Initialize graph conversation service
+        graph_conversation = GraphConversationService(db)
+        contextual_memory = ContextualMemoryService()
+
+        # Get enhanced memory context
+        memory_context = contextual_memory.get_contextual_memories_with_insights(
+            user_id=current_user.id,
+            current_message=message.content,
+            db=db,
+            conversation_history=None,  # We can add this later
+            limit=10
+        )
+
+        # Process through graph conversation service
+        result = graph_conversation.process_conversation(session_id, message.content)
+
+        # Combine results
+        return {
+            "success": True,
+            "response": result["response"],
+            "insights": result["insights"],
+            "memory_context": {
+                "active_memories": memory_context["memories"],
+                "insights": memory_context["insights"],
+                "follow_up_questions": memory_context["follow_up_questions"],
+                "memory_gaps": memory_context["memory_gaps"],
+                "context_summary": memory_context["context_summary"]
+            },
+            "metadata": result["metadata"],
+            "session_status": {
+                "current_phase": session.current_phase,
+                "is_complete": session.is_complete,
+                "is_crisis": session.is_crisis
+            }
+        }
+
+    except ImportError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Graph conversation service not available: {str(e)}"
+        )
+    except Exception as e:
+        import logging
+        logging.error(f"Error in graph conversation processing: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Graph conversation processing error: {str(e)}")
+
+@app.post("/graph-conversation/analyze-memory-context")
+async def analyze_memory_context(
+    request: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Analyze memory context for a given message without processing through full conversation flow
+    Useful for testing memory integration
+    """
+    try:
+        from app.services.contextual_memory_service import ContextualMemoryService
+
+        contextual_memory = ContextualMemoryService()
+
+        message_content = request.get("message", "")
+        if not message_content:
+            raise HTTPException(status_code=400, detail="Message content is required")
+
+        # Get enhanced memory context
+        memory_analysis = contextual_memory.get_contextual_memories_with_insights(
+            user_id=current_user.id,
+            current_message=message_content,
+            db=db,
+            limit=15
+        )
+
+        return {
+            "success": True,
+            "message_analyzed": message_content,
+            "memory_analysis": memory_analysis,
+            "summary": {
+                "memories_found": len(memory_analysis["memories"]),
+                "insights_generated": len(memory_analysis["insights"]),
+                "follow_up_questions": len(memory_analysis["follow_up_questions"]),
+                "memory_gaps": len(memory_analysis["memory_gaps"])
+            }
+        }
+
+    except ImportError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Contextual memory service not available: {str(e)}"
+        )
+    except Exception as e:
+        import logging
+        logging.error(f"Error in memory context analysis: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Memory analysis error: {str(e)}")
 
 # Memory Management Endpoints
 @app.get("/memory/summary")

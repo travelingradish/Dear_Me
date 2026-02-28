@@ -1,7 +1,11 @@
 import axios from 'axios';
 import { AuthResponse, User, Conversation, DiaryEntry } from '../types';
 
-const API_BASE_URL = 'http://localhost:8001';
+// Auto-detect API host from browser hostname for mobile support
+const hostname = window.location.hostname;
+const API_BASE_URL = (hostname === 'localhost' || hostname === '127.0.0.1')
+  ? 'http://localhost:8001'
+  : `http://${hostname}:8001`;
 
 const api = axios.create({
   baseURL: API_BASE_URL,

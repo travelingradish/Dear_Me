@@ -1,7 +1,12 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON, Boolean, Float
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from app.core.database import Base
+
+# Helper function for timezone-aware UTC timestamps
+def utc_now():
+    """Return timezone-aware UTC timestamp for database defaults"""
+    return datetime.now(timezone.utc)
 
 class User(Base):
     __tablename__ = "users"
@@ -11,7 +16,7 @@ class User(Base):
     age = Column(Integer, nullable=True)  # Optional age for age-appropriate conversations
     hashed_password = Column(String(128), nullable=False)
     ai_character_name = Column(String(100), default="AI Assistant", nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     
     # Relationships
     diary_sessions = relationship("DiarySession", back_populates="user")
@@ -32,7 +37,7 @@ class DiarySession(Base):
     final_diary = Column(Text)  # User-edited version (defaults to composed_diary)
     is_complete = Column(Boolean, default=False)
     is_crisis = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     completed_at = Column(DateTime)
     
     # Relationships
@@ -48,7 +53,7 @@ class ConversationMessage(Base):
     content = Column(Text, nullable=False)
     intent = Column(String(50))  # What the assistant was trying to accomplish
     slot_updates = Column(JSON)  # What slots were updated by this message
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     
     # Relationships
     diary_session = relationship("DiarySession", back_populates="conversation_messages")
@@ -62,7 +67,7 @@ class Conversation(Base):
     message = Column(Text, nullable=False)
     response = Column(Text, nullable=False)
     language = Column(String(10), default="en")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
 class DiaryEntry(Base):
     __tablename__ = "diary_entries"
@@ -74,7 +79,7 @@ class DiaryEntry(Base):
     conversation_history = Column(JSON)  # Store full conversation history for viewing
     language = Column(String(10), default="en")
     tone = Column(String(20), default="reflective")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     
     # Relationships
     user = relationship("User", back_populates="diary_entries")
@@ -89,8 +94,8 @@ class UserMemory(Base):
     memory_value = Column(Text, nullable=False)  # The actual memory content
     confidence_score = Column(Float, default=1.0)  # 0.0 to 1.0, higher means more confident
     source_type = Column(String(20), default="conversation")  # conversation, diary, explicit
-    first_mentioned = Column(DateTime, default=datetime.utcnow)
-    last_updated = Column(DateTime, default=datetime.utcnow)
+    first_mentioned = Column(DateTime, default=utc_now)
+    last_updated = Column(DateTime, default=utc_now)
     mention_count = Column(Integer, default=1)  # How many times this memory was reinforced
     is_active = Column(Boolean, default=True)  # Can be deactivated without deletion
     is_sensitive = Column(Boolean, default=False)  # Mark sensitive information
@@ -117,7 +122,7 @@ class MemorySnapshot(Base):
     extracted_memories = Column(JSON)  # List of new/updated memories from this session
     memory_context = Column(JSON)  # Memories that were active/used in this session
     session_summary = Column(Text)  # Brief summary of the session for memory context
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     
     # Relationships
     user = relationship("User", back_populates="memory_snapshots")

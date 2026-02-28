@@ -21,7 +21,7 @@ A gentle, AI-powered journaling companion offering guided reflection, casual con
 
 ### 🍎 **macOS Users - Easy One-Click Installation**
 
-[**⬇️ Download Dear_Me_1.0.0.dmg**]([https://bit.ly/dear-me-mac-v1])
+[**⬇️ Download Dear_Me_1.0.0.dmg**](https://bit.ly/dear-me-mac-v1)
 
 **Installation takes ~15 minutes (first time), then just double-click to launch!**
 

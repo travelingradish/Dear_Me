@@ -37,15 +37,88 @@ A gentle, AI-powered journaling companion offering guided reflection, casual con
 
 ---
 
+### 🪟 **Windows Users - Professional Installer**
+
+[**⬇️ Download Dear_Me_1.0.0_Windows.exe**](https://github.com/travelingradish/Dear_Me/releases/download/v1.0.0-beta/Dear_Me_1.0.0_Windows.exe)
+
+**Installation takes ~15 minutes (first time), then just double-click to launch!**
+
+1. Download the .exe file above
+2. Run the installer (Windows may show a SmartScreen warning - click "More info" → "Run anyway")
+3. The installer automatically installs Python, Node.js, and Ollama
+4. Click the "Dear Me" shortcut on your Desktop
+5. Start journaling! 📝
+
+⏱️ **Subsequent launches**: 30 seconds (everything cached)
+
+---
+
 ## 🌍 Platform Support
 
 | Platform | Status | Version |
 |----------|--------|---------|
 | **macOS** | ✅ Available | v1.0.0 |
-| **Windows** | 📅 Coming Soon | Q3 2026 |
+| **Windows** | ✅ Available | v1.0.0 |
 | **Linux** | 📅 Planned | Future |
 
-*Currently, Dear Me is only available for macOS 10.13 or later. Windows and Linux support are planned for future releases.*
+*Dear Me is available for macOS 10.13+ and Windows 10+. Linux support is planned for future releases.*
+
+---
+
+## 📁 Project Structure (For Developers & Interested Users)
+
+Dear Me organizes platform-specific installation and deployment code in separate directories:
+
+```
+Dear_Me/
+├── 🍎 macos/                   # macOS installer & launcher
+│   ├── setup.sh               # Daily launcher (called by app bundle)
+│   ├── build_dmg.sh          # Builds the .dmg installer
+│   ├── Dear Me.command       # Desktop shortcut
+│   ├── README_macOS.txt      # User installation guide
+│   └── DEVELOPER_GUIDE.md    # Developer documentation
+│
+├── 🪟 windows/                 # Windows installer & launcher
+│   ├── setup_windows.bat     # Daily launcher (double-click to run)
+│   ├── build_installer.ps1   # Builds the .exe installer
+│   ├── build_installer.nsi   # NSIS installer script
+│   ├── install_dependencies.ps1  # First-time setup
+│   ├── README_Windows.txt    # User installation guide
+│   ├── DEVELOPER_GUIDE.md    # Developer documentation
+│   └── assets/               # Icons and images
+│
+├── backend/                   # FastAPI Python backend
+│   ├── app/                  # Application code
+│   ├── main.py              # Entry point
+│   └── requirements.txt      # Python dependencies
+│
+├── frontend/                  # React TypeScript frontend
+│   ├── src/                 # Source code
+│   ├── build/               # Pre-built production app (used by installers)
+│   └── package.json         # NPM dependencies
+│
+└── README.md               # This file
+```
+
+### 🎯 For Different Audiences
+
+**End Users:**
+- Download installers from [Releases](https://github.com/travelingradish/Dear_Me/releases)
+- Read `README_macOS.txt` or `README_Windows.txt` for installation help
+
+**macOS Developers:**
+- Platform code: `macos/setup.sh`, `macos/build_dmg.sh`
+- Build guide: `macos/DEVELOPER_GUIDE.md`
+- Build command: `cd macos && ./build_dmg.sh`
+
+**Windows Developers:**
+- Platform code: `windows/setup_windows.bat`, `windows/build_installer.ps1`
+- Build guide: `windows/DEVELOPER_GUIDE.md`
+- Build command: `cd windows && powershell -ExecutionPolicy Bypass -File build_installer.ps1`
+
+**Full-Stack Developers:**
+- Backend: `backend/main.py` (FastAPI), see `CLAUDE.md` for dev commands
+- Frontend: `frontend/src/` (React TypeScript), see `CLAUDE.md` for dev commands
 
 ---
 
@@ -168,6 +241,8 @@ The script handles everything automatically.
 
 **macOS**: Double-click "Dear Me.app" in Applications (30 seconds)
 
+**Windows**: Double-click "Dear Me" on your Desktop (30 seconds)
+
 **Terminal**: Run `./setup.sh` (2-3 minutes)
 
 ### 🎨 Get Started
@@ -179,6 +254,24 @@ The script handles everything automatically.
    - ✍️ **Free Entry**: Direct writing with AI assistance
 
 **✨ No Configuration Required**: Dear Me works out of the box with sensible defaults!
+
+---
+
+## 💡 Installation Help & Troubleshooting
+
+Running into issues? Check the platform-specific guides:
+
+- **🍎 macOS Help**: See `macos/README_macOS.txt` for detailed troubleshooting
+- **🪟 Windows Help**: See `windows/README_Windows.txt` for detailed troubleshooting
+- **General Issues**: [GitHub Issues](https://github.com/travelingradish/Dear_Me/issues)
+
+**Key Points:**
+- First install takes ~15 minutes (downloads Python, Node.js, Ollama, AI model)
+- Subsequent launches are ~30 seconds
+- Requires stable internet for initial setup
+- The AI model is ~4.7GB (optional to download on first launch, can be added later)
+
+---
 
 ## 🤖 How It Works
 
